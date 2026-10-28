@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1
+# 铸版主服务镜像（三阶段：前端构建 → Go 编译 → 精简运行时）
+#
+# 版本号在编译期注入（-ldflags -X），镜像里带着「自己是谁」：
+# 出问题时第一句话永远是「线上跑的是哪个版本」，而它不该靠镜像 tag 猜。
+#
+#   docker build -f Dockerfile.web \
+#     --build-arg VERSION=3.4.0 \
+#     --build-arg COMMIT=$(git rev-parse --short HEAD) \
+#     --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+#     -t ghcr.io/kinghtxg/zhuban:3.4.0 .
+
+# ---- Stage 1: 前端（Vite + React + Arco，构建产物自包含）----
+FROM node:20-alpine AS frontend
+# 默认官方源。中国大陆请覆盖成镜像源（构建时间差一个量级）：
+#   --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+ARG NPM_REGISTRY=https://registry.npmjs.org
+WORKDIR /build
+COPY web/package.json web/package-lock.json* ./
+RUN npm config set registry "$NPM_REGISTRY" && (npm ci || npm install)
+COPY web/ ./
+RUN npm run build
+
+# ---- Stage 2: Go 主服务（内嵌前端 dist、官网与内置示例模板）----
+FROM golang:1.26-alpine AS backend
+ARG GOPROXY=https://proxy.golang.org,direct
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV CGO_ENABLED=0
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go env -w GOPROXY="$GOPROXY" && go mod download
+COPY . .
+COPY --from=frontend /build/dist ./web/dist
+# -s -w 去掉符号表与调试信息；版本三元组用 -X 注入，源码里的默认值是 dev。
+# 注意 -X 的路径必须是完整导入路径，写错不会报错——只会静默保持 dev，
+# 于是「镜像 tag 是 3.4.0、页面显示 dev、更新提示永远不弹」。
+RUN go build -trimpath \
+      -ldflags "-s -w \
+        -X docforge/server/internal/version.Version=${VERSION} \
+        -X docforge/server/internal/version.Commit=${COMMIT} \
+        -X docforge/server/internal/version.BuildTime=${BUILD_TIME}" \
+      -o /out/zhuban ./server
+
+# ---- Stage 3: 运行时 ----
+FROM alpine:3.20
+# apk 源同理：默认官方源，国内用 --build-arg APK_MIRROR=mirrors.tencentyun.com
+ARG APK_MIRROR=dl-cdn.alpinelinux.org
+RUN if [ "$APK_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
+      sed -i "s|dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories; \
+    fi \
+    && apk add --no-cache ca-certificates tzdata wget \
+    # 非 root 运行：容器被打穿时的代价直接取决于进程权限。
+    # uid 10001 与宿主 ./volumes 的属主一致（见 compose 的 init-volumes）。
+    && adduser -D -u 10001 zhuban \
+    && mkdir -p /data && chown zhuban /data
+ENV TZ=Asia/Shanghai
+WORKDIR /app
+COPY --from=backend /out/zhuban /app/zhuban
+USER zhuban
+EXPOSE 8100
+ENTRYPOINT ["/app/zhuban"]

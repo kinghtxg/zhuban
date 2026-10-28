@@ -1,0 +1,169 @@
+# docforge 单机部署（PostgreSQL + Python 渲染服务 + Go 主服务）
+# 使用：cp .env.example .env 并修改密钥 → docker compose up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: docforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docforge}
+      POSTGRES_DB: ${POSTGRES_DB:-docforge}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docforge} -d ${POSTGRES_DB:-docforge}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - docforge
+
+  render:
+    build:
+      context: ./render-service
+      dockerfile: Dockerfile
+      args:
+        # 默认官方源；国内建议在 .env 里设成腾讯云内网源，构建时间差一个量级。
+        APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
+        PIP_INDEX: ${PIP_INDEX:-https://pypi.org/simple}
+    image: docforge-render:1.0.0
+    container_name: docforge-render
+    restart: unless-stopped
+    environment:
+      PORT: "8101"
+      MAX_TEMPLATE_MB: "10"
+      MAX_DATA_MB: "20"
+      MAX_IMAGE_MB: "5"
+      RENDER_TIMEOUT_SECONDS: "60"
+      LO_CONCURRENCY: "2"
+      PREVIEW_TTL_MINUTES: "30"
+      PREVIEW_MAX_PAGES: "20"
+      IMAGE_ALLOW_PRIVATE: "false"
+      TMP_DIR: "/tmp/docforge"
+      # 运维导入的字体目录（宿主 ./volumes/fonts）。与 /usr/share/fonts/custom
+      # 分开：那个是仓库字体的只读挂载，动态导入写不进去也删不掉。
+      FONT_IMPORT_DIR: "/usr/share/fonts/imported"
+    volumes:
+      - render-tmp:/tmp/docforge
+      - ./fonts:/usr/share/fonts/custom:ro
+      # 导入字体：web 容器写入（可写卷），render 只读识别。
+      # fontconfig 默认递归扫描 /usr/share/fonts，所以子目录无需额外配置。
+      - ./volumes/fonts:/usr/share/fonts/imported:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8101/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 90s
+    networks:
+      - docforge
+
+  # 一次性初始化：宿主 bind 卷 ./volumes 在 Linux 上默认 root 属主，
+  # web 容器以非 root(uid 10001) 运行，需先修正属主，否则播种/写产物 permission denied。
+  init-volumes:
+    image: alpine:3.20
+    container_name: docforge-init
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /data/templates /data/jobs /data/previews /data/files /data/tmp /data/fonts && chown -R 10001:10001 /data"]
+    volumes:
+      - ./volumes:/data
+    networks:
+      - docforge
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        # 版本三元组编进二进制，页面页脚与 /api/v1/version 都取它。
+        VERSION: ${APP_VERSION:-dev}
+        COMMIT: ${APP_COMMIT:-unknown}
+        BUILD_TIME: ${APP_BUILD_TIME:-unknown}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+        APK_MIRROR: ${APK_MIRROR:-dl-cdn.alpinelinux.org}
+    image: docforge-web:1.0.0
+    container_name: docforge-web
+    restart: unless-stopped
+    ports:
+      # 只绑回环：唯一入口应该是前面的反代 / WAF。
+      # 绑 0.0.0.0 等于给公网留了一条绕开 WAF 的直连通道——限流、拦截规则、
+      # 上传体积上限全在那一层，绕过它就等于这些约束都不存在。
+      - "127.0.0.1:${WEB_PORT:-18100}:8100"
+    environment:
+      HTTP_ADDR: ":8100"
+      EXTERNAL_BASE_URL: ${EXTERNAL_BASE_URL:-http://localhost:${WEB_PORT:-18100}}
+      DATABASE_URL: "host=postgres port=5432 user=${POSTGRES_USER:-docforge} password=${POSTGRES_PASSWORD:-docforge} dbname=${POSTGRES_DB:-docforge} sslmode=disable TimeZone=Asia/Shanghai"
+      RENDER_SERVICE_URL: "http://render:8101"
+      DATA_DIR: "/data"
+      SIGNED_URL_SECRET: ${SIGNED_URL_SECRET:-change-me-signed-url-secret}
+      SIGNED_URL_TTL_HOURS: ${SIGNED_URL_TTL_HOURS:-24}
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-auth-secret}
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-7}
+      AUTH_DEV: ${AUTH_DEV:-false}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # 始终具备管理员权限的用户名（逗号分隔）。OIDC 自动开户只会给 member，
+      # 名单在就永远成立，不依赖手工改库。
+      ADMIN_USERNAMES: ${ADMIN_USERNAMES:-}
+      ALLOW_REGISTER: ${ALLOW_REGISTER:-false}
+      OIDC_ENABLED: ${OIDC_ENABLED:-false}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URL: ${OIDC_REDIRECT_URL:-}
+      OIDC_AUTO_PROVISION: ${OIDC_AUTO_PROVISION:-active}
+      MAX_RECORDS: ${MAX_RECORDS:-1000}
+      MAX_JSON_MB: ${MAX_JSON_MB:-20}
+      MAX_TEMPLATE_MB: ${MAX_TEMPLATE_MB:-10}
+      CALLBACK_ALLOW_PRIVATE: ${CALLBACK_ALLOW_PRIVATE:-false}
+      CALLBACK_HOST_ALLOWLIST: ${CALLBACK_HOST_ALLOWLIST:-}
+      # 来源 IP 解析：只有直连对端命中此名单才采信 X-Forwarded-For。
+      # 留空 = 内置默认（本机 + 私网段）；直连公网无代理时设 none。
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      SEED_BUILTIN: ${SEED_BUILTIN:-true}
+      # 自动更新提示：读 GitHub 上的最新 Release，右下角弹窗。
+      # 隔离内网没有 api.github.com，把它设 false 就不会每 6 小时刷一次失败日志。
+      UPDATE_CHECK: ${UPDATE_CHECK:-true}
+      UPDATE_REPO: ${UPDATE_REPO:-kinghtxg/zhuban}
+      # ---- 邮件投递（V3.2）----
+      # SMTP 凭据只在服务端。API 侧只能给收件人/主题/正文/附件模式。
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TLS: ${SMTP_TLS:-}
+      # 留空则 API 投递一律拒绝（fail-closed），管理端测试邮件不受此限
+      EMAIL_ALLOWED_DOMAINS: ${EMAIL_ALLOWED_DOMAINS:-}
+      EMAIL_MAX_RECIPIENTS: ${EMAIL_MAX_RECIPIENTS:-10}
+      EMAIL_MAX_ATTACH_MB: ${EMAIL_MAX_ATTACH_MB:-20}
+      EMAIL_MAX_BODY_CHARS: ${EMAIL_MAX_BODY_CHARS:-8000}
+      TZ: "Asia/Shanghai"
+    volumes:
+      - ./volumes:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      render:
+        condition: service_healthy
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8100/api/v1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - docforge
+
+volumes:
+  pgdata:
+  render-tmp:
+
+networks:
+  docforge:
+    driver: bridge

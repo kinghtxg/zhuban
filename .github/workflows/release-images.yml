@@ -1,0 +1,144 @@
+name: release-images
+
+# 打 tag（v3.4.0）或在 Actions 页面手动触发时，构建并推送两个镜像到 GHCR：
+#   ghcr.io/<owner>/zhuban:<version>   —— Go 主服务（内嵌前端、官网、安装向导）
+#   ghcr.io/<owner>/zhuban-render:<version> —— Python 渲染服务（LibreOffice）
+#
+# 为什么镜像构建放在 CI 而不是发版人的机器上：
+#   1. 渲染镜像要装 LibreOffice，构建一次几分钟，本机做纯属浪费时间；
+#   2. 需要 amd64 + arm64 两套（Mac/ARM 服务器），本机只能出自己那一种；
+#   3. 镜像里注入的版本号由 tag 唯一决定，不依赖"记得改某个变量"。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要打的版本号（不带 v），仅手动触发时使用'
+        required: true
+        default: '0.0.0-dev'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # 版本号只有一处定义，两个镜像共用：主服务的「关于」与更新检查都读它，
+  # 渲染服务也带上，出问题时能对上同一批。
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build_time: ${{ steps.v.outputs.build_time }}
+    steps:
+      - id: v
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "本次发布版本：${VERSION}"
+
+  web:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU 让 amd64 runner 也能产出 arm64 镜像。
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成标签
+        id: tags
+        run: |
+          IMG="${REGISTRY}/${{ github.repository_owner }}/zhuban"
+          {
+            echo "list<<EOF"
+            echo "${IMG}:${{ needs.meta.outputs.version }}"
+            echo "${IMG}:${{ github.sha }}"
+            # 手动触发打 0.0.0-dev 这类版本时不要污染 latest：
+            # latest 必须永远指向一个正式发布，否则「拉 latest」会拉到开发版。
+            if [[ ! "${{ needs.meta.outputs.version }}" == *dev* ]]; then
+              echo "${IMG}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.web
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.list }}
+          labels: |
+            org.opencontainers.image.title=铸版 ZHUBAN
+            org.opencontainers.image.description=把 Word 模板变成产线：变量渲染、PDF、图表换数、联机签章、批量投递、全程审计
+            org.opencontainers.image.version=${{ needs.meta.outputs.version }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ needs.meta.outputs.build_time }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+  render:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成标签
+        id: tags
+        run: |
+          IMG="${REGISTRY}/${{ github.repository_owner }}/zhuban-render"
+          {
+            echo "list<<EOF"
+            echo "${IMG}:${{ needs.meta.outputs.version }}"
+            echo "${IMG}:${{ github.sha }}"
+            if [[ ! "${{ needs.meta.outputs.version }}" == *dev* ]]; then
+              echo "${IMG}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./render-service
+          file: ./render-service/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.list }}
+          labels: |
+            org.opencontainers.image.title=铸版 ZHUBAN 渲染服务
+            org.opencontainers.image.description=docxtpl + LibreOffice：docx→pdf、页面缩略图、模板扫描
+            org.opencontainers.image.version=${{ needs.meta.outputs.version }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=render
+          cache-to: type=gha,scope=render,mode=max

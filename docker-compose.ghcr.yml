@@ -1,0 +1,151 @@
+# 铸版 ZHUBAN · 镜像版单机部署（从 GHCR 拉取，不构建）
+#
+#   cp .env.example .env    # 改两个密钥
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+# 与 docker-compose.yml 的区别：那一份从源码构建（改代码时用这份），
+# 这一份只拉镜像（只是想跑起来时用这份）。两份的容器名不同，
+# 所以不能同时起在同一个目录里。
+#
+# ⚠️ 装完之前不要把这个端口暴露到公网：首次打开页面时，
+#    谁先填完安装向导谁就是管理员。装完（页面提示"安装入口已关闭"）之后再挂反代。
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zhuban-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zhuban}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 里设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-zhuban}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zhuban} -d ${POSTGRES_DB:-zhuban}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [zhuban]
+
+  render:
+    image: ghcr.io/kinghtxg/zhuban-render:${APP_VERSION:-latest}
+    container_name: zhuban-render
+    restart: unless-stopped
+    environment:
+      PORT: "8101"
+      MAX_TEMPLATE_MB: "${MAX_TEMPLATE_MB:-10}"
+      MAX_DATA_MB: "${MAX_JSON_MB:-20}"
+      MAX_IMAGE_MB: "${MAX_IMAGE_MB:-5}"
+      RENDER_TIMEOUT_SECONDS: "60"
+      LO_CONCURRENCY: "${LO_CONCURRENCY:-2}"
+      PREVIEW_TTL_MINUTES: "30"
+      PREVIEW_MAX_PAGES: "20"
+      # 图片回调默认不允许内网地址（SSRF 防护）。私有化部署里图片常在内网，
+      # 确实需要时再打开，并配合下面的 CALLBACK_HOST_ALLOWLIST 收窄范围。
+      IMAGE_ALLOW_PRIVATE: "${CALLBACK_ALLOW_PRIVATE:-false}"
+      TMP_DIR: "/tmp/zhuban"
+      FONT_IMPORT_DIR: "/usr/share/fonts/imported"
+    volumes:
+      - render-tmp:/tmp/zhuban
+      # 自制/已授权的字体放这里。**不要放 Windows 自带字体**：
+      # 那些是商业授权字体，随镜像或仓库分发属于侵权。
+      - ./fonts:/usr/share/fonts/custom:ro
+      - ./volumes/fonts:/usr/share/fonts/imported:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8101/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      # LibreOffice 首次启动要建字体缓存，给足 90 秒；少了它健康检查会把
+      # 一个只是"还没热身完"的容器判成不健康。
+      start_period: 90s
+    networks: [zhuban]
+
+  # 宿主 bind 卷在 Linux 上默认 root 属主，而 web 容器以 uid 10001 运行。
+  # 不先修属主，播种内置模板和写产物都会 permission denied。
+  init-volumes:
+    image: alpine:3.20
+    container_name: zhuban-init
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /data/templates /data/jobs /data/previews /data/files /data/tmp /data/fonts && chown -R 10001:10001 /data"]
+    volumes:
+      - ./volumes:/data
+    networks: [zhuban]
+
+  web:
+    image: ghcr.io/kinghtxg/zhuban:${APP_VERSION:-latest}
+    container_name: zhuban-web
+    restart: unless-stopped
+    ports:
+      # 默认绑所有网卡，装完就能用。只想本机先看的话改成 "127.0.0.1:${WEB_PORT:-18100}:8100"。
+      - "${WEB_PORT:-18100}:8100"
+    environment:
+      HTTP_ADDR: ":8100"
+      # 必须填成用户浏览器里看到的地址：直链、OIDC 回调、接入示例全靠它。
+      # 写 localhost 而实际用域名访问，签名直链会指向访问者自己的机器。
+      EXTERNAL_BASE_URL: ${EXTERNAL_BASE_URL:-http://localhost:18100}
+      DATABASE_URL: "host=postgres port=5432 user=${POSTGRES_USER:-zhuban} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB:-zhuban} sslmode=disable TimeZone=Asia/Shanghai"
+      RENDER_SERVICE_URL: "http://render:8101"
+      DATA_DIR: "/data"
+      SIGNED_URL_SECRET: ${SIGNED_URL_SECRET:?请在 .env 里设置 SIGNED_URL_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET:?请在 .env 里设置 AUTH_SECRET}
+      SESSION_TTL_DAYS: "${SESSION_TTL_DAYS:-7}"
+      SIGNED_URL_TTL_HOURS: "${SIGNED_URL_TTL_HOURS:-24}"
+      RETENTION_DAYS: "${RETENTION_DAYS:-7}"
+      # 开发后门：信任 X-Dev-User 头，等于免认证。除非本机联调，永远保持 false。
+      AUTH_DEV: "false"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      ADMIN_USERNAMES: "${ADMIN_USERNAMES:-}"
+      ALLOW_REGISTER: "${ALLOW_REGISTER:-false}"
+      OIDC_ENABLED: "${OIDC_ENABLED:-false}"
+      OIDC_ISSUER: "${OIDC_ISSUER:-}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
+      OIDC_REDIRECT_URL: "${OIDC_REDIRECT_URL:-}"
+      OIDC_AUTO_PROVISION: "${OIDC_AUTO_PROVISION:-active}"
+      MAX_RECORDS: "${MAX_RECORDS:-1000}"
+      MAX_JSON_MB: "${MAX_JSON_MB:-20}"
+      MAX_TEMPLATE_MB: "${MAX_TEMPLATE_MB:-10}"
+      MAX_IMAGE_MB: "${MAX_IMAGE_MB:-5}"
+      CALLBACK_ALLOW_PRIVATE: "${CALLBACK_ALLOW_PRIVATE:-false}"
+      CALLBACK_HOST_ALLOWLIST: "${CALLBACK_HOST_ALLOWLIST:-}"
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      SEED_BUILTIN: "${SEED_BUILTIN:-true}"
+      UPDATE_CHECK: "${UPDATE_CHECK:-true}"
+      UPDATE_REPO: "${UPDATE_REPO:-kinghtxg/zhuban}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      SMTP_FROM: "${SMTP_FROM:-}"
+      SMTP_TLS: "${SMTP_TLS:-}"
+      EMAIL_ALLOWED_DOMAINS: "${EMAIL_ALLOWED_DOMAINS:-}"
+      EMAIL_MAX_RECIPIENTS: "${EMAIL_MAX_RECIPIENTS:-10}"
+      EMAIL_MAX_ATTACH_MB: "${EMAIL_MAX_ATTACH_MB:-20}"
+      EMAIL_MAX_BODY_CHARS: "${EMAIL_MAX_BODY_CHARS:-8000}"
+      TZ: "Asia/Shanghai"
+    volumes:
+      - ./volumes:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      render:
+        condition: service_healthy
+      init-volumes:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8100/api/v1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks: [zhuban]
+
+volumes:
+  pgdata:
+  render-tmp:
+
+networks:
+  zhuban:
+    driver: bridge

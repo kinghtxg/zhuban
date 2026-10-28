@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>安装 · 铸版 ZHUBAN</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#06070B">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233370ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-size='38' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3E铸%3C/text%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   铸版安装向导 · 设计令牌
+   与官网共用同一套色板（墨/钢/熔）与品牌渐变，装完跳进控制台时
+   不会出现"换了个产品"的错觉。
+   ============================================================ */
+:root{
+  --ink:#06070B; --ink-1:#0A0C13; --ink-2:#0E111A; --ink-3:#141826;
+  --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
+  --fg:#EEF1F8; --fg-2:#A9B1C7; --fg-3:#6F7791;
+  --brand:#4D7CFF; --brand-2:#7C5CFF;
+  --ok:#3DDC97; --warn:#FFB020; --err:#FF5C7C;
+  --grad-brand:linear-gradient(120deg,#3370ff 0%,#7c5cff 100%);
+  --r-sm:9px; --r-md:14px; --r-lg:20px;
+  --ease:cubic-bezier(.22,.68,0,1);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;min-height:100vh;background:var(--ink);color:var(--fg);
+  font-family:var(--font);font-size:15px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;
+}
+/* 极淡的网格 + 顶部一团极光：深色底不显得空，但不抢表单的注意力 */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(circle at 30% 0%,#000 0%,transparent 70%);
+  -webkit-mask-image:radial-gradient(circle at 30% 0%,#000 0%,transparent 70%);
+  opacity:.45;
+}
+body::after{
+  content:"";position:fixed;width:820px;height:820px;left:-260px;top:-420px;z-index:0;
+  pointer-events:none;border-radius:50%;
+  background:radial-gradient(circle,rgba(77,124,255,.20) 0%,rgba(124,92,255,.10) 38%,transparent 68%);
+  filter:blur(12px);animation:drift 22s var(--ease) infinite alternate;
+}
+@keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(90px,60px,0) scale(1.12)}}
+::selection{background:rgba(77,124,255,.35)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:6px}
+h1,h2,h3{margin:0;line-height:1.28;letter-spacing:-.015em;font-weight:650}
+p{margin:0}
+code{font-family:var(--mono);font-size:.92em}
+
+/* ---------- 外框 ---------- */
+.shell{
+  position:relative;z-index:1;flex:1;width:100%;max-width:1080px;margin:0 auto;
+  padding:44px 28px 64px;display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);
+  gap:56px;align-items:start;
+}
+@media (max-width:880px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:28px;padding:28px 18px 48px}
+}
+
+/* ---------- 左栏：品牌与步骤 ---------- */
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:26px}
+.brand .mark{
+  width:34px;height:34px;border-radius:10px;background:var(--grad-brand);
+  display:grid;place-items:center;font-weight:700;font-size:17px;color:#fff;
+  box-shadow:0 6px 18px rgba(77,124,255,.35);flex:0 0 auto;
+}
+.brand b{font-size:16px;letter-spacing:.02em;font-weight:650}
+.brand span{margin-left:6px;font-size:11px;color:var(--fg-3);letter-spacing:.22em;text-transform:uppercase}
+.rail h1{font-size:26px;margin-bottom:10px}
+.rail .sub{color:var(--fg-2);font-size:14px}
+@media (max-width:880px){.rail h1{font-size:22px}}
+
+.steps{margin-top:30px;position:relative;padding-left:4px}
+.step{display:flex;gap:14px;padding:0 0 26px;position:relative}
+.step:last-child{padding-bottom:0}
+.step::before{
+  /* 连线：从圆点到下一个圆点。最后一项没有。 */
+  content:"";position:absolute;left:13px;top:26px;bottom:0;width:1px;background:var(--line-2);
+}
+.step:last-child::before{display:none}
+.dot{
+  flex:0 0 auto;width:27px;height:27px;border-radius:50%;border:1px solid var(--line-2);
+  display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--fg-3);
+  background:var(--ink-1);transition:all .35s var(--ease);position:relative;z-index:1;
+}
+.step[data-state="active"] .dot{border-color:transparent;background:var(--grad-brand);color:#fff;box-shadow:0 0 0 4px rgba(77,124,255,.14)}
+.step[data-state="done"] .dot{border-color:rgba(61,220,151,.4);background:rgba(61,220,151,.12);color:var(--ok)}
+.step-t{font-size:14px;font-weight:600;color:var(--fg-2);transition:color .3s}
+.step[data-state="active"] .step-t,.step[data-state="done"] .step-t{color:var(--fg)}
+.step-d{font-size:12.5px;color:var(--fg-3);margin-top:2px}
+
+.note{
+  margin-top:30px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:rgba(255,255,255,.025);font-size:12.5px;color:var(--fg-3);line-height:1.65;
+}
+.note b{color:var(--fg-2);font-weight:600}
+
+/* ---------- 右栏：卡片 ---------- */
+.card{
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:32px;
+  background:linear-gradient(180deg,rgba(20,24,38,.92),rgba(10,12,19,.92));
+  box-shadow:0 24px 60px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.05);
+  backdrop-filter:blur(8px);
+}
+@media (max-width:880px){.card{padding:24px 20px}}
+.panel{display:none;animation:rise .42s var(--ease)}
+.panel[data-show]{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .panel{animation:none}
+  body::after{animation:none}
+}
+.panel h2{font-size:18px;margin-bottom:6px}
+.panel .hint{color:var(--fg-3);font-size:13px;margin-bottom:24px}
+
+/* ---------- 表单 ---------- */
+.field{margin-bottom:16px}
+.field:last-of-type{margin-bottom:0}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--fg-2);margin-bottom:7px}
+.field label .opt{font-weight:400;color:var(--fg-3);margin-left:6px;font-size:12px}
+.input{
+  width:100%;height:42px;padding:0 13px;border-radius:var(--r-sm);
+  border:1px solid var(--line-2);background:rgba(0,0,0,.28);color:var(--fg);
+  font-family:inherit;font-size:14px;transition:border-color .18s,box-shadow .18s,background .18s;
+}
+.input::placeholder{color:#4E5568}
+.input:hover{border-color:rgba(255,255,255,.26)}
+.input:focus{
+  outline:none;border-color:var(--brand);background:rgba(0,0,0,.4);
+  box-shadow:0 0 0 3px rgba(77,124,255,.18);
+}
+.input[aria-invalid="true"]{border-color:var(--err);box-shadow:0 0 0 3px rgba(255,92,124,.14)}
+select.input{appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4.5 6 8.5 10 4.5' stroke='%236F7791' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 13px center;padding-right:34px;
+}
+select.input option{background:var(--ink-3);color:var(--fg)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+@media (max-width:560px){.row{grid-template-columns:minmax(0,1fr)}}
+.err{color:var(--err);font-size:12.5px;margin-top:6px;min-height:0;display:none}
+.err[data-show]{display:block}
+
+/* 密码强度：三条短杠。
+   空值时整块隐藏——三条灰杠在深色底上看起来像一条分隔线，
+   会被当成"密码区到此结束"的视觉噪音。 */
+.meter{display:none;gap:6px;margin-top:9px}
+.meter[data-score="1"],.meter[data-score="2"],.meter[data-score="3"]{display:flex}
+.meter i{height:4px;flex:1;border-radius:2px;background:rgba(255,255,255,.12);transition:background .3s}
+.meter[data-score="1"] i:nth-child(1){background:var(--err)}
+.meter[data-score="2"] i:nth-child(-n+2){background:var(--warn)}
+.meter[data-score="3"] i{background:var(--ok)}
+
+/* ---------- 按钮 ---------- */
+.actions{display:flex;align-items:center;gap:10px;margin-top:26px}
+.actions .spacer{flex:1}
+.btn{
+  height:42px;padding:0 20px;border-radius:var(--r-sm);border:1px solid transparent;
+  font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .16s var(--ease),box-shadow .2s,background .2s,border-color .2s;
+  white-space:nowrap;
+}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--grad-brand);color:#fff;box-shadow:0 8px 22px rgba(77,124,255,.3)}
+.btn-primary:hover{box-shadow:0 10px 28px rgba(77,124,255,.42)}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;box-shadow:none;transform:none}
+.btn-ghost{background:transparent;color:var(--fg-2);border-color:var(--line-2)}
+.btn-ghost:hover{background:rgba(255,255,255,.05);color:var(--fg)}
+.btn .spin{
+  width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
+  border-top-color:#fff;animation:spin .7s linear infinite;display:none;
+}
+.btn[data-busy] .spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* 窄屏上按钮平分一行：三个小按钮挤在右半边时，
+   拇指点中的概率和误触的概率差不多。 */
+@media (max-width:560px){
+  .actions{flex-wrap:wrap}
+  .actions .spacer{display:none}
+  .actions .btn{flex:1 1 auto}
+}
+
+/* ---------- 全局提示 ---------- */
+.alert{
+  display:none;padding:11px 14px;border-radius:var(--r-sm);font-size:13px;margin-bottom:20px;
+  border:1px solid rgba(255,92,124,.34);background:rgba(255,92,124,.1);color:#FFC3CE;
+}
+.alert[data-show]{display:block}
+.alert[data-kind="ok"]{border-color:rgba(61,220,151,.34);background:rgba(61,220,151,.1);color:#B6F3D6}
+
+/* ---------- 完成页 ---------- */
+.done{text-align:center;padding:14px 0 4px}
+.done .tick{
+  width:56px;height:56px;border-radius:50%;margin:0 auto 18px;display:grid;place-items:center;
+  background:rgba(61,220,151,.12);border:1px solid rgba(61,220,151,.4);
+}
+.done .tick svg{width:26px;height:26px;stroke:var(--ok);stroke-width:2.4;fill:none;
+  stroke-linecap:round;stroke-linejoin:round}
+.done h2{font-size:20px;margin-bottom:8px}
+.done p{color:var(--fg-2);font-size:13.5px}
+.kv{
+  margin:22px 0 0;text-align:left;border:1px solid var(--line);border-radius:var(--r-md);
+  overflow:hidden;
+}
+.kv div{display:flex;justify-content:space-between;gap:16px;padding:11px 15px;font-size:13px}
+.kv div + div{border-top:1px solid var(--line)}
+.kv dt{color:var(--fg-3)}
+.kv dd{margin:0;font-family:var(--mono);font-size:12.5px;color:var(--fg-2);word-break:break-all}
+
+.foot{
+  position:relative;z-index:1;text-align:center;font-size:12px;color:var(--fg-3);
+  padding:0 24px 30px;
+}
+.foot a{color:var(--fg-2);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.16)}
+.foot a:hover{color:var(--fg);border-color:var(--fg-2)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="rail">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">铸</div>
+      <b>铸版</b><span>ZHUBAN</span>
+    </div>
+    <h1>把这份实例装起来</h1>
+    <p class="sub">三步：建管理员账号 → 配邮件（可跳过）→ 进控制台。全部数据留在你自己的机器上。</p>
+
+    <div class="steps" id="steps">
+      <div class="step" data-state="active" data-for="1">
+        <div class="dot">1</div>
+        <div>
+          <div class="step-t">管理员账号</div>
+          <div class="step-d">登录控制台用的第一个账号</div>
+        </div>
+      </div>
+      <div class="step" data-for="2">
+        <div class="dot">2</div>
+        <div>
+          <div class="step-t">邮件服务</div>
+          <div class="step-d">可选，随时可以关掉或稍后再配</div>
+        </div>
+      </div>
+      <div class="step" data-for="3">
+        <div class="dot">3</div>
+        <div>
+          <div class="step-t">完成</div>
+          <div class="step-d">安装入口随即永久关闭</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>装完之后：</b>本页面会被服务端删除，<code>/install</code> 返回 404。
+      要重装只能清空数据库——这是有意的，避免留一个能重建管理员的入口。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="alert" id="alert" role="alert" aria-live="polite"></div>
+
+    <!-- ---------- 步骤 1 ---------- -->
+    <section class="panel" data-panel="1" data-show>
+      <h2>创建管理员</h2>
+      <p class="hint">这个账号拥有全部权限：管理用户、模板、密钥与设置。</p>
+
+      <form id="form-admin" novalidate>
+        <div class="row">
+          <div class="field">
+            <label for="username">用户名</label>
+            <input class="input" id="username" name="username" autocomplete="username"
+                   placeholder="3-64 位，字母/数字/_/-" required>
+            <div class="err" data-err="username"></div>
+          </div>
+          <div class="field">
+            <label for="display_name">显示名<span class="opt">选填</span></label>
+            <input class="input" id="display_name" name="display_name" autocomplete="name"
+                   placeholder="留空则与用户名一致">
+            <div class="err" data-err="display_name"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">密码</label>
+          <input class="input" id="password" name="password" type="password"
+                 autocomplete="new-password" placeholder="至少 8 位，需同时含字母与数字" required>
+          <div class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="err" data-err="password"></div>
+        </div>
+
+        <div class="field">
+          <label for="password2">确认密码</label>
+          <input class="input" id="password2" name="password2" type="password"
+                 autocomplete="new-password" placeholder="再输一次" required>
+          <div class="err" data-err="password2"></div>
+        </div>
+
+        <div class="field">
+          <label for="email">邮箱<span class="opt">选填，用于接收通知</span></label>
+          <input class="input" id="email" name="email" type="email" autocomplete="email"
+                 placeholder="可以不填">
+          <div class="err" data-err="email"></div>
+        </div>
+
+        <div class="actions">
+          <div class="spacer"></div>
+          <button class="btn btn-primary" type="submit" id="btn-admin">
+            <span class="spin"></span>下一步
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ---------- 步骤 2 ---------- -->
+    <section class="panel" data-panel="2">
+      <h2>邮件服务<span style="font-size:12px;color:var(--fg-3);font-weight:400;margin-left:8px">可跳过</span></h2>
+      <p class="hint">配了才能把成品直接投递到收件人邮箱。不配也能用——下载、直链、API 回调都不受影响。</p>
+
+      <form id="form-mail" novalidate>
+        <div class="row">
+          <div class="field">
+            <label for="smtp_host">SMTP 主机</label>
+            <input class="input" id="smtp_host" name="smtp_host" placeholder="smtp.example.com" autocomplete="off">
+            <div class="err" data-err="smtp_host"></div>
+          </div>
+          <div class="field">
+            <label for="smtp_port">端口</label>
+            <input class="input" id="smtp_port" name="smtp_port" type="number" min="1" max="65535"
+                   placeholder="587" value="587" inputmode="numeric">
+            <div class="err" data-err="smtp_port"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="smtp_tls">加密方式</label>
+            <select class="input" id="smtp_tls" name="smtp_tls">
+              <option value="starttls">STARTTLS（587，推荐）</option>
+              <option value="tls">直连 TLS（465）</option>
+              <option value="none">不加密（仅内网）</option>
+            </select>
+            <div class="err" data-err="smtp_tls"></div>
+          </div>
+          <div class="field">
+            <label for="smtp_from">发件地址</label>
+            <input class="input" id="smtp_from" name="smtp_from" type="email"
+                   placeholder="铸版 &lt;no-reply@example.com&gt;" autocomplete="off">
+            <div class="err" data-err="smtp_from"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="smtp_user">账号</label>
+            <input class="input" id="smtp_user" name="smtp_user" placeholder="通常就是邮箱地址" autocomplete="off">
+            <div class="err" data-err="smtp_user"></div>
+          </div>
+          <div class="field">
+            <label for="smtp_password">密码 / 授权码</label>
+            <input class="input" id="smtp_password" name="smtp_password" type="password"
+                   autocomplete="new-password" placeholder="留空则不修改">
+            <div class="err" data-err="smtp_password"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="mail_allowed_domains">允许投递的域名<span class="opt">逗号分隔</span></label>
+          <input class="input" id="mail_allowed_domains" name="mail_allowed_domains"
+                 placeholder="example.com, corp.example.com" autocomplete="off">
+          <div class="err" data-err="mail_allowed_domains"></div>
+        </div>
+        <p class="hint" style="margin:-6px 0 0;font-size:12.5px">
+          留空表示<strong>不允许</strong>通过 API 投递（fail-closed）。不确定就留空，之后在「管理 → 邮件」里再开。
+        </p>
+
+        <div class="field" style="margin-top:18px">
+          <label for="test_to">测试收件人<span class="opt">只用于下面这个按钮</span></label>
+          <input class="input" id="test_to" name="test_to" type="email"
+                 placeholder="your@example.com" autocomplete="off">
+          <div class="err" data-err="test_to"></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-ghost" type="button" id="btn-test">
+            <span class="spin"></span>发测试邮件
+          </button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost" type="button" id="btn-skip">跳过</button>
+          <button class="btn btn-primary" type="submit" id="btn-mail">
+            <span class="spin"></span>保存并继续
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ---------- 步骤 3 ---------- -->
+    <section class="panel" data-panel="3">
+      <div class="done">
+        <div class="tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5l5.2 5.2L20 6.8"/></svg>
+        </div>
+        <h2>安装完成</h2>
+        <p>管理员账号已创建，你已经处于登录状态。</p>
+      </div>
+
+      <div class="kv">
+        <div><dt>访问地址</dt><dd id="done-url">—</dd></div>
+        <div><dt>版本</dt><dd id="done-version">—</dd></div>
+        <div><dt>安装入口</dt><dd>已关闭（/install → 404）</dd></div>
+        <div><dt>邮件服务</dt><dd id="done-mail">—</dd></div>
+      </div>
+
+      <div class="actions">
+        <div class="spacer"></div>
+        <a class="btn btn-primary" href="/" id="btn-go">进入控制台</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="foot">
+  铸版 ZHUBAN · Apache-2.0 · <a href="https://github.com/kinghtxg/zhuban" target="_blank" rel="noopener">GitHub</a>
+</div>
+
+<script src="/install.js" defer></script>
+</body>
+</html>

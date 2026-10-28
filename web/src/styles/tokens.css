@@ -1,0 +1,164 @@
+/**
+ * docforge 设计令牌（Design Tokens）
+ * 规范基线：Arco Design —— 字节跳动开源设计系统
+ *
+ * 【核心原则】
+ * 1. 颜色一律复用 Arco 原生变量（--color-text-* / --color-bg-* / --color-fill-* /
+ *    --color-border-* / --primary-*），本项目**不另造色板**。
+ *    历史教训：曾经的 --df-text-1/2/3 与 Arco 的 --color-text-1/2/3 重复定义，
+ *    两套体系并存导致同一灰色在代码里有 3 种写法。
+ * 2. 本文件只定义 Arco 未覆盖的三类东西：布局尺寸、间距栅格、字号阶梯。
+ * 3. 主色为 RGB 三元组（Arco 约定），使用时必须 rgb() 包裹：
+ *      color: rgb(var(--primary-6));          ✅
+ *      color: var(--primary-6);               ❌
+ *    中性色（--color-text-* / --color-border-*）已是完整色值，可直接用。
+ */
+
+:root {
+  /* ============================================================
+     一、布局尺寸（Arco Pro 后台标准）
+     ============================================================ */
+  --layout-header-height: 56px; /* 顶部通栏 */
+  --layout-sider-width: 220px; /* 二级菜单展开宽度 */
+  --layout-sider-width-collapsed: 48px; /* 收起宽度 */
+  --layout-crumb-height: 44px; /* 面包屑条 */
+  --layout-content-padding: 24px; /* 内容区边距 */
+  --layout-content-max: 1440px; /* 内容最大宽度，超宽屏不拉散 */
+
+  /* ============================================================
+     二、间距栅格（4px 基准，与 Arco 一致）
+     只允许使用以下档位，禁止出现 5px/7px/13px 这类非栅格值
+     ============================================================ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ============================================================
+     三、字号阶梯（Arco Typography）
+     页面标题 20 / 区块标题 16 / 正文 14 / 辅助 12
+     ============================================================ */
+  --font-size-display: 24px; /* 登录页品牌名等大标题 */
+  --font-size-title-1: 20px; /* 页面主标题 */
+  --font-size-title-2: 18px; /* 抽屉 / 弹窗标题 */
+  --font-size-title-3: 16px; /* 卡片 / 区块标题 */
+  --font-size-body-3: 14px; /* 正文、表格、按钮（默认字号） */
+  --font-size-body-2: 13px; /* 次要正文、侧栏菜单 */
+  --font-size-body-1: 12px; /* 辅助说明、时间戳、角标 */
+
+  /* 行高 */
+  --line-height-base: 1.5715; /* Arco 正文行高 = 22/14 */
+  --line-height-tight: 1.4; /* 标题行高 */
+
+  /* 字重 */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600; /* Arco 标题用 600，不用 700 */
+
+  /* ============================================================
+     四、字体栈
+     与 Arco 一致：系统字体优先，中文回退 PingFang SC / Microsoft YaHei
+     ============================================================ */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-family-mono: 'SF Mono', 'Cascadia Code', Consolas, 'Liberation Mono', Menlo,
+    monospace;
+
+  /* ============================================================
+     五、过渡动效
+     曲线与「刻本」统一：cubic-bezier(0.2, 0, 0, 1) 起步快、收尾轻，
+     是 Material/iOS 同源的「减速」曲线。Arco 自带的
+     cubic-bezier(0.34,0.69,0.1,1) 中段会先冲过头，多个元素同时动效时
+     观感发飘 —— 这是「AI 感」的来源之一，此处统一换掉。
+     时长只有两档：120ms（颜色/描边等小属性）、200ms（位移/阴影等大属性）。
+     ============================================================ */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+
+  --transition-fast: var(--dur-fast) var(--ease);
+  --transition-base: var(--dur) var(--ease);
+  --transition-slow: 320ms var(--ease);
+
+  /* 焦点环：键盘可达性用。3px 柔环而非 Arco 默认的 2px 实环，
+     与刻本一致，弱化但足够可见 */
+  --focus-ring: 0 0 0 3px rgba(51, 112, 255, 0.18);
+
+  /* ============================================================
+     六、阴影（Arco 未提供 shadow token，按字节规范固化）
+     投影恒为深色半透明，与明暗主题无关，故使用固定 rgba
+     ============================================================ */
+  --shadow-1: 0 1px 2px rgba(31, 35, 41, 0.06);
+  --shadow-2: 0 2px 4px rgba(31, 35, 41, 0.06), 0 4px 12px rgba(31, 35, 41, 0.08);
+  --shadow-3: 0 8px 24px rgba(31, 35, 41, 0.12), 0 20px 48px rgba(31, 35, 41, 0.08);
+  /* 可点击卡片的悬停态：比 shadow-2 更贴地（近景阴影加重、远景扩散变淡），
+     配合 translateY(-4px) 形成「抬起」错觉。直接取自刻本的 book-card:hover */
+  --shadow-hover: 0 8px 24px rgba(31, 35, 41, 0.1), 0 2px 6px rgba(31, 35, 41, 0.06);
+  --shadow-brand: 0 2px 8px rgba(51, 112, 255, 0.3); /* 仅品牌标识使用 */
+
+  /* ============================================================
+     六、品牌标识（仅此一处允许使用品牌渐变）
+     ⚠️ 注意：brand-gradient 不在此处定义，见文件末尾 body 块。
+     CSS 自定义属性在【声明它的元素】上就完成变量替换，:root(html) 上没有
+     Arco 注入的 --primary-*（它们在 body 上），写在这里会得到无效值，
+     继承到子元素后 `background: var(--brand-gradient)` 直接算成 none，
+     表现为品牌方块透明、白字白底看不见。
+     ============================================================ */
+}
+
+/* ============================================================
+   七、语义别名
+   仅用于「Arco 变量名在业务语境下不够直观」的场景，值必须指向 Arco 变量，
+   绝不允许写死色值。
+
+   ⚠️⚠️ 这一整块必须挂在 body 上，不能挂在 :root（html）上。
+   Arco 把 --color-* / --primary-* 注入在 body，而 CSS 自定义属性是在
+   【声明它的那个元素】上就完成变量替换的：写在 :root 上时 --color-bg-1
+   还不存在，--app-bg-panel 会被固化成无效值，并原样继承给所有后代。
+   后果不是报错，而是「静默全透明」——实测过：
+     :root  --app-bg-panel = ""（空串）
+     .app-shell  background = rgba(0,0,0,0)
+     .grid-card  background = rgba(0,0,0,0)
+   页面底色与卡片填充一起消失，整个站其实浮在浏览器默认白底上，
+   「灰底 + 白卡」的层次感完全丢失。这是同一个坑第二次踩，务必牢记。
+   ============================================================ */
+body {
+  /* 底色三档，对应刻本的 page / panel / hover：
+     page 用 fill-1（#F7F8FA）而不是 bg-2 —— Arco 浅色主题下
+     bg-1~bg-5 全是 #fff，若把页面底色映射到 bg-2，页面与卡片同色，
+     卡片只能靠描边勉强分开，失去「灰底白卡」的层次。 */
+  --app-bg-page: var(--color-fill-1); /* 页面底色（#F7F8FA） */
+  --app-bg-panel: var(--color-bg-2); /* 卡片 / 面板（#fff） */
+  --app-bg-hover: var(--color-fill-2); /* hover 态填充（#F2F3F5） */
+  --app-bg-selected: rgb(var(--primary-1)); /* 菜单选中态底 */
+
+  --app-text-title: var(--color-text-1); /* 标题 / 正文 */
+  --app-text-body: var(--color-text-2); /* 次要正文 */
+  --app-text-caption: var(--color-text-3); /* 辅助 / 占位 */
+  --app-text-disabled: var(--color-text-4); /* 禁用 */
+
+  --app-border: var(--color-border-2); /* 常规描边 */
+  --app-border-light: var(--color-border-1); /* 弱分隔线 */
+  --app-border-strong: var(--color-border-3); /* 强调描边（卡片悬停） */
+
+  /* 品牌渐变 —— 与 --shadow-brand 同源，属设计规范里的品牌常量 */
+  --brand-gradient: linear-gradient(135deg, #3370ff 0%, #5a5ae8 100%);
+}
+
+/* 圆角：与「刻本」同一把尺子 —— 面板 10px、控件 6px、标签 4px。
+   写死像素而不指向 Arco 的 --border-radius-*：那三个值由
+   ConfigProvider 的 theme.borderRadius 派生，一旦有人改主题圆角，
+   10 > 6 > 4 的层次关系会一起塌掉，而这是设计意图。
+   放在 :root 无妨 —— 它们不依赖任何 Arco 变量。 */
+:root {
+  --app-radius-panel: 10px; /* 卡片 / 面板 / 弹窗 */
+  --app-radius-control: 6px; /* 按钮 / 输入框 / 缩略图 */
+  --app-radius-tag: 4px; /* 标签 / 角标 */
+}

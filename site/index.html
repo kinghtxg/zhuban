@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>铸版 · 把 Word 模板变成产线</title>
+<meta name="description" content="铸版把一份 docx 模板和一批数据变成几千份成品：变量渲染、PDF 转换、图表换数、联机签章、批量投递，每一步都可审计。Go + Python + PostgreSQL，Docker 单机部署，Apache-2.0 开源。">
+<meta name="theme-color" content="#06070B">
+<meta property="og:type" content="website">
+<meta property="og:title" content="铸版 · 把 Word 模板变成产线">
+<meta property="og:description" content="一份模板 + 一批数据 = 几千份成品。变量渲染、PDF、图表换数、签章、投递、审计，一条链路做完。">
+<meta property="og:url" content="https://zb.kinghtxg.com/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233370ff'/%3E%3Cstop offset='1' stop-color='%237c5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-size='38' font-family='PingFang SC,Microsoft YaHei,sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3E铸%3C/text%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   铸版官网 · 设计令牌
+   只用一套色板：墨（底）/ 钢（文字）/ 熔（强调）。
+   产品内部是浅色工作台，官网是深色展台——两者共用同一个品牌渐变
+   （#3370ff → #7c5cff），保证从官网点进控制台不出现"换了个产品"的错觉。
+   ============================================================ */
+:root{
+  --ink:#06070B;
+  --ink-1:#0A0C13;
+  --ink-2:#0E111A;
+  --ink-3:#141826;
+  --line:rgba(255,255,255,.09);
+  --line-2:rgba(255,255,255,.16);
+  --fg:#EEF1F8;
+  --fg-2:#A9B1C7;
+  --fg-3:#6F7791;
+  --brand:#4D7CFF;
+  --brand-2:#7C5CFF;
+  --ember:#FF7A45;
+  --cyan:#33E1D3;
+  --ok:#3DDC97;
+  --grad-brand:linear-gradient(120deg,#3370ff 0%,#7c5cff 100%);
+  --grad-ember:linear-gradient(120deg,#ff7a45 0%,#ff4d6d 100%);
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-xl:28px;
+  --max:1180px;
+  --ease:cubic-bezier(.22,.68,0,1);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--ink);color:var(--fg);font-family:var(--font);
+  font-size:16px;line-height:1.75;letter-spacing:.01em;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body::before{
+  /* 全站一层极淡的网格：让深色背景不显得"空"，但不抢内容 */
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 22%,#000 0%,transparent 72%);
+  -webkit-mask-image:radial-gradient(circle at 50% 22%,#000 0%,transparent 72%);
+  opacity:.5;
+}
+::selection{background:rgba(77,124,255,.35)}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
+h1,h2,h3,h4{margin:0;line-height:1.24;letter-spacing:-.015em;font-weight:650}
+p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+code,kbd{font-family:var(--mono);font-size:.9em}
+:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:4px}
+
+.wrap{width:100%;max-width:var(--max);margin:0 auto;padding:0 28px;position:relative;z-index:1}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--fg-3);font-weight:600;
+}
+.eyebrow::before{content:"";width:22px;height:1px;background:linear-gradient(90deg,var(--brand),transparent)}
+.grad-text{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ---------- 顶部导航 ---------- */
+.nav{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  transition:background .35s var(--ease),border-color .35s var(--ease),backdrop-filter .35s;
+  border-bottom:1px solid transparent;
+}
+.nav.scrolled{
+  background:rgba(6,7,11,.72);backdrop-filter:blur(18px) saturate(150%);
+  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  border-bottom-color:var(--line);
+}
+.nav-in{display:flex;align-items:center;gap:14px;height:68px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16.5px;letter-spacing:.02em}
+.brand-mark{
+  width:32px;height:32px;border-radius:9px;background:var(--grad-brand);
+  display:grid;place-items:center;font-size:16px;color:#fff;
+  box-shadow:0 6px 20px rgba(77,124,255,.4);flex:none;
+}
+.brand span{white-space:nowrap}
+.brand small{color:var(--fg-3);font-weight:500;font-size:11.5px;letter-spacing:.1em;margin-left:3px}
+.nav-links{display:flex;gap:2px;margin-left:26px}
+.nav-links a{
+  padding:8px 13px;border-radius:8px;font-size:14px;color:var(--fg-2);
+  transition:color .2s,background .2s;position:relative;
+}
+.nav-links a:hover{color:var(--fg);background:rgba(255,255,255,.05)}
+.nav-links a.active{color:var(--fg)}
+.nav-links a.active::after{
+  content:"";position:absolute;left:13px;right:13px;bottom:2px;height:1.5px;
+  background:var(--grad-brand);border-radius:2px;
+}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.scroll-bar{
+  position:fixed;top:0;left:0;height:2px;width:0;z-index:70;
+  background:linear-gradient(90deg,#3370ff,#7c5cff 55%,#ff7a45);
+  box-shadow:0 0 14px rgba(124,92,255,.55);
+}
+
+/* ---------- 按钮 ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:42px;padding:0 20px;border-radius:11px;font-size:14.5px;font-weight:600;
+  border:1px solid transparent;cursor:pointer;white-space:nowrap;
+  transition:transform .25s var(--ease),box-shadow .3s,background .25s,border-color .25s,color .25s;
+  font-family:inherit;
+}
+.btn:active{transform:translateY(1px) scale(.995)}
+.btn-primary{
+  background:var(--grad-brand);color:#fff;
+  box-shadow:0 10px 30px -8px rgba(77,124,255,.7),inset 0 1px 0 rgba(255,255,255,.22);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 44px -10px rgba(124,92,255,.8),inset 0 1px 0 rgba(255,255,255,.28)}
+.btn-ghost{
+  background:rgba(255,255,255,.045);border-color:var(--line-2);color:var(--fg);
+  backdrop-filter:blur(8px);
+}
+.btn-ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.3);transform:translateY(-2px)}
+.btn-lg{height:50px;padding:0 26px;font-size:15.5px;border-radius:13px}
+.btn .ico{width:16px;height:16px;flex:none}
+
+/* ---------- 首屏 ---------- */
+.hero{position:relative;padding:150px 0 96px;overflow:hidden}
+#dust{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.55}
+.aurora{
+  position:absolute;z-index:0;border-radius:50%;filter:blur(90px);pointer-events:none;
+  will-change:transform;
+}
+.aurora.a{width:640px;height:640px;left:-160px;top:-220px;background:radial-gradient(circle,rgba(51,112,255,.34),transparent 66%);animation:drift1 24s ease-in-out infinite}
+.aurora.b{width:560px;height:560px;right:-140px;top:-120px;background:radial-gradient(circle,rgba(124,92,255,.3),transparent 66%);animation:drift2 30s ease-in-out infinite}
+.aurora.c{width:520px;height:520px;left:34%;top:280px;background:radial-gradient(circle,rgba(255,122,69,.14),transparent 68%);animation:drift1 34s ease-in-out infinite reverse}
+@keyframes drift1{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(60px,40px,0) scale(1.08)}}
+@keyframes drift2{0%,100%{transform:translate3d(0,0,0) scale(1.05)}50%{transform:translate3d(-50px,60px,0) scale(.95)}}
+
+.hero-grid{display:grid;grid-template-columns:1.06fr .94fr;gap:56px;align-items:center;position:relative;z-index:2}
+.pill{
+  display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 13px 0 9px;
+  border-radius:999px;border:1px solid var(--line-2);background:rgba(255,255,255,.04);
+  font-size:13px;color:var(--fg-2);backdrop-filter:blur(6px);
+}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(61,220,151,.16);animation:pulse 2.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(61,220,151,.18)}50%{box-shadow:0 0 0 7px rgba(61,220,151,0)}}
+.pill b{color:var(--fg);font-weight:600}
+
+h1.hero-title{
+  font-size:clamp(38px,4.9vw,66px);margin:22px 0 0;font-weight:700;letter-spacing:-.03em;line-height:1.08;
+}
+h1.hero-title .line{display:block}
+h1.hero-title em{
+  font-style:normal;background:linear-gradient(96deg,#8FB0FF 0%,#B79BFF 46%,#FFB48F 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.hero-sub{margin-top:22px;font-size:17px;color:var(--fg-2);max-width:520px;line-height:1.8}
+.hero-sub code{color:#BFD0FF;background:rgba(77,124,255,.12);padding:1px 6px;border-radius:5px}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px;align-items:center}
+.hero-meta{display:flex;flex-wrap:wrap;gap:18px;margin-top:30px;font-size:13px;color:var(--fg-3)}
+.hero-meta span{display:inline-flex;align-items:center;gap:7px}
+.hero-meta .tick{width:14px;height:14px;color:var(--ok)}
+
+/* 首屏右侧：铸件/产线视觉 */
+.forge{position:relative;height:452px;perspective:1400px}
+.forge-card{
+  /* 卡片右侧留出 54px 走廊：浮动标签靠这条走廊挂边，
+     不压正文（压住正文会让人以为字被截断了）。 */
+  position:absolute;top:20px;right:54px;bottom:40px;left:0;border-radius:var(--r-xl);
+  border:1px solid var(--line-2);
+  background:linear-gradient(160deg,rgba(20,24,38,.94),rgba(10,12,19,.96));
+  box-shadow:0 40px 100px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.07);
+  padding:20px;overflow:hidden;transform-style:preserve-3d;
+  display:flex;flex-direction:column;
+  transition:transform .5s var(--ease);
+}
+.forge-card::before{
+  content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;opacity:.5;
+  background:linear-gradient(140deg,rgba(51,112,255,.65),transparent 40%,transparent 62%,rgba(255,122,69,.5));
+  -webkit-mask:linear-gradient(#000,#000) content-box,linear-gradient(#000,#000);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+}
+.mc-head{display:flex;align-items:center;gap:10px;padding-bottom:13px;border-bottom:1px solid var(--line)}
+.mc-dots{display:flex;gap:5px}
+.mc-dots i{width:8px;height:8px;border-radius:50%;background:#2A3048}
+.mc-title{font-size:12px;color:var(--fg-3);font-family:var(--mono);letter-spacing:.04em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-badge{
+  margin-left:auto;font-size:11px;padding:3px 8px;border-radius:6px;font-family:var(--mono);
+  background:rgba(61,220,151,.12);color:#7FE9B8;border:1px solid rgba(61,220,151,.25);
+}
+.mc-body{padding-top:14px;font-family:var(--mono);font-size:11.5px;line-height:1.95;color:var(--fg-2);flex:1}
+.mc-row{display:flex;gap:10px;white-space:nowrap}
+.mc-line{padding:1px 0;opacity:0;transform:translateY(4px)}
+.mc-line.in{opacity:1;transform:none;transition:opacity .4s,transform .4s}
+.k{color:#7C89B5}
+.s{color:#9FE8C7}
+.b{color:#8FB0FF}
+.e{color:#FF9B78}
+.cmt{color:#4C5470}
+.mc-caret{display:inline-block;width:6px;height:13px;background:var(--brand);vertical-align:-2px;animation:blink 1.1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.mc-progress{
+  margin-top:16px;height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;
+}
+.mc-progress i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,#3370ff,#7c5cff,#ff7a45);transition:width 1.4s var(--ease)}
+.mc-foot{display:flex;justify-content:space-between;margin-top:9px;font-size:10.5px;color:var(--fg-3);font-family:var(--mono)}
+
+/* 浮动小卡片 */
+.float{
+  position:absolute;z-index:3;border-radius:12px;border:1px solid var(--line-2);
+  background:rgba(14,17,26,.9);backdrop-filter:blur(14px);
+  padding:9px 13px;font-size:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9);
+  display:flex;align-items:center;gap:8px;
+}
+.float .ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none}
+.float.f1{right:0;top:-8px;animation:floaty 6s ease-in-out infinite}
+.float.f2{left:-14px;bottom:0;animation:floaty 7.5s ease-in-out infinite .6s}
+.float.f3{right:0;bottom:150px;animation:floaty 8s ease-in-out infinite .3s}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+.f-ic-pdf{background:rgba(255,122,69,.16);color:#FFB48F}
+.f-ic-doc{background:rgba(77,124,255,.16);color:#A9C0FF}
+.f-ic-mail{background:rgba(51,225,211,.14);color:#8CEFE6}
+
+/* ---------- 通用区块 ---------- */
+section{position:relative;z-index:1}
+.sec{padding:104px 0}
+.sec-head{max-width:720px}
+.sec-head h2{font-size:clamp(27px,3.1vw,40px);margin-top:16px;letter-spacing:-.025em}
+.sec-head p{margin-top:16px;color:var(--fg-2);font-size:16px;max-width:640px}
+.sec-head.center{margin:0 auto;text-align:center}
+.sec-head.center p{margin-left:auto;margin-right:auto}
+
+/* 滚动入场 */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- 流水线 ---------- */
+.pipe{
+  margin-top:56px;border:1px solid var(--line);border-radius:var(--r-xl);
+  background:linear-gradient(180deg,rgba(14,17,26,.9),rgba(8,9,14,.9));
+  padding:34px 30px;position:relative;overflow:hidden;
+}
+.pipe::after{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(124,92,255,.7),rgba(255,122,69,.5),transparent);
+}
+.pipe-rail{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;position:relative}
+.pipe-rail::before{
+  content:"";position:absolute;top:34px;left:8%;right:8%;height:1px;
+  background:linear-gradient(90deg,rgba(51,112,255,.5),rgba(124,92,255,.5),rgba(255,122,69,.5));
+  opacity:.55;
+}
+.node{position:relative;text-align:center;padding:0 6px}
+.node .n-ic{
+  width:68px;height:68px;margin:0 auto;border-radius:20px;display:grid;place-items:center;
+  border:1px solid var(--line-2);background:linear-gradient(160deg,rgba(24,29,45,.96),rgba(12,14,22,.96));
+  position:relative;z-index:1;transition:transform .4s var(--ease),border-color .3s,box-shadow .4s;
+}
+.node:hover .n-ic{transform:translateY(-6px) rotate(-2deg);border-color:rgba(124,92,255,.6);box-shadow:0 18px 40px -18px rgba(124,92,255,.8)}
+.node .n-ic svg{width:28px;height:28px}
+.node h4{margin-top:15px;font-size:15px}
+.node p{margin-top:6px;font-size:12.8px;color:var(--fg-3);line-height:1.65}
+.node .n-tag{
+  display:inline-block;margin-top:9px;font-family:var(--mono);font-size:10.5px;
+  color:#8FB0FF;background:rgba(77,124,255,.1);border:1px solid rgba(77,124,255,.2);
+  padding:2px 7px;border-radius:5px;
+}
+
+/* ---------- 能力卡片 ---------- */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px}
+.card{
+  position:relative;border:1px solid var(--line);border-radius:var(--r-lg);
+  background:linear-gradient(170deg,rgba(16,19,30,.92),rgba(9,11,17,.96));
+  padding:24px 22px 22px;overflow:hidden;
+  display:flex;flex-direction:column;
+  transition:transform .4s var(--ease),border-color .3s,box-shadow .4s;
+}
+.card::before{
+  /* 跟随鼠标的高光：--mx/--my 由 JS 写入 */
+  content:"";position:absolute;inset:0;opacity:0;transition:opacity .35s;pointer-events:none;
+  background:radial-gradient(320px circle at var(--mx,50%) var(--my,50%),rgba(124,92,255,.16),transparent 62%);
+}
+.card:hover{transform:translateY(-5px);border-color:rgba(124,92,255,.42);box-shadow:0 28px 60px -34px rgba(77,124,255,.9)}
+.card:hover::before{opacity:1}
+.card .c-ic{
+  width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+  border:1px solid var(--line-2);background:rgba(255,255,255,.04);margin-bottom:16px;
+}
+.card .c-ic svg{width:20px;height:20px}
+.card h3{font-size:16.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card p{margin-top:10px;font-size:13.6px;color:var(--fg-2);line-height:1.78}
+.card .c-tag{
+  margin-top:auto;padding-top:12px;display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;color:var(--fg-3);
+  border-top:1px dashed var(--line);width:100%;
+}
+.card .badge-new{
+  font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 6px;border-radius:4px;
+  background:rgba(255,122,69,.14);color:#FFB48F;border:1px solid rgba(255,122,69,.28);
+}
+.card.wide{grid-column:span 2}
+
+/* ---------- 场景 ---------- */
+.scenes{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
+.scene{
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 20px;
+  background:linear-gradient(180deg,rgba(15,18,28,.9),rgba(9,10,16,.94));
+  transition:border-color .3s,transform .4s var(--ease);
+}
+.scene:hover{border-color:var(--line-2);transform:translateY(-4px)}
+.scene .num{font-family:var(--mono);font-size:11px;color:var(--fg-3)}
+.scene h4{margin-top:12px;font-size:15.5px}
+.scene p{margin-top:8px;font-size:13px;color:var(--fg-2);line-height:1.72}
+.scene ul{margin-top:12px;display:grid;gap:6px}
+.scene li{font-size:12.4px;color:var(--fg-3);display:flex;gap:7px;align-items:flex-start}
+.scene li::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--brand);margin-top:8px;flex:none}
+
+/* ---------- 架构 ---------- */
+.arch{
+  margin-top:50px;display:grid;grid-template-columns:.9fr 1.1fr;gap:36px;align-items:center;
+}
+.arch-fig{
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:22px;
+  background:radial-gradient(120% 120% at 10% 0%,rgba(24,29,48,.9),rgba(8,9,14,.96));
+}
+.arch-fig svg{width:100%;height:auto}
+.arch-list{display:grid;gap:14px}
+.arch-item{display:flex;gap:14px;padding:15px 16px;border-radius:12px;border:1px solid transparent;transition:background .25s,border-color .25s}
+.arch-item:hover{background:rgba(255,255,255,.03);border-color:var(--line)}
+.arch-item .ai-k{
+  font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:5px;height:fit-content;
+  background:rgba(77,124,255,.12);color:#A9C0FF;border:1px solid rgba(77,124,255,.22);flex:none;margin-top:2px;
+}
+.arch-item h4{font-size:14.5px}
+.arch-item p{margin-top:5px;font-size:13px;color:var(--fg-2);line-height:1.7}
+
+/* ---------- 数字 ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:56px;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;background:var(--line)}
+.stat{background:rgba(9,11,17,.96);padding:30px 24px;text-align:center;transition:background .3s}
+.stat:hover{background:rgba(16,19,30,.98)}
+.stat .v{font-size:clamp(30px,3.6vw,44px);font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .v span{font-size:.5em;font-weight:600;color:var(--fg-3);margin-left:3px}
+.stat .l{margin-top:9px;font-size:13px;color:var(--fg-2)}
+.stat .s{margin-top:4px;font-size:11.5px;color:var(--fg-3);font-family:var(--mono)}
+
+/* ---------- 安全 ---------- */
+.sec-dark{background:linear-gradient(180deg,rgba(10,12,19,0),rgba(10,12,19,.85) 12%,rgba(10,12,19,.85) 88%,rgba(10,12,19,0))}
+.safe-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:48px}
+.safe{
+  display:flex;gap:14px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:rgba(255,255,255,.015);transition:border-color .3s,background .3s;
+}
+.safe:hover{border-color:rgba(61,220,151,.34);background:rgba(61,220,151,.04)}
+.safe .s-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;background:rgba(61,220,151,.1);color:var(--ok)}
+.safe h4{font-size:14.5px}
+.safe p{margin-top:6px;font-size:13px;color:var(--fg-2);line-height:1.72}
+.safe code{color:#9FE8C7;background:rgba(61,220,151,.1);padding:1px 5px;border-radius:4px}
+
+/* ---------- GitHub ---------- */
+.gh{
+  margin-top:56px;position:relative;border-radius:var(--r-xl);overflow:hidden;
+  border:1px solid var(--line-2);
+  background:linear-gradient(150deg,rgba(22,26,42,.95),rgba(9,10,16,.98));
+  padding:40px;
+}
+.gh::before{
+  content:"";position:absolute;width:520px;height:520px;right:-160px;top:-220px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,92,255,.28),transparent 66%);filter:blur(50px);
+}
+.gh-in{position:relative;display:grid;grid-template-columns:1fr auto;gap:36px;align-items:center}
+.gh h3{font-size:clamp(21px,2.4vw,28px)}
+.gh p{margin-top:12px;color:var(--fg-2);font-size:14.5px;max-width:520px}
+.repo{
+  margin-top:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.repo-url{
+  display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13.5px;
+  border:1px solid var(--line-2);border-radius:10px;padding:10px 14px;
+  background:rgba(0,0,0,.42);color:#C9D4F5;
+}
+.repo-url svg{width:16px;height:16px;color:var(--fg-3);flex:none}
+.repo-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.gh-side{display:grid;gap:10px;min-width:190px}
+.gh-stat{display:flex;justify-content:space-between;gap:16px;font-size:13px;color:var(--fg-2);padding:9px 0;border-bottom:1px dashed var(--line)}
+.gh-stat b{color:var(--fg);font-weight:600;font-family:var(--mono);font-size:12.5px}
+
+/* ---------- 结尾 ---------- */
+.final{padding:110px 0 90px;text-align:center;position:relative}
+.final h2{font-size:clamp(30px,4vw,52px);letter-spacing:-.03em}
+.final p{margin:18px auto 0;max-width:560px;color:var(--fg-2);font-size:16px}
+.final .hero-cta{justify-content:center}
+footer{border-top:1px solid var(--line);padding:40px 0 46px;position:relative;z-index:1}
+.foot-in{display:flex;justify-content:space-between;gap:26px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--fg-3)}
+.foot-links{display:flex;gap:20px;flex-wrap:wrap}
+.foot-links a{transition:color .2s}
+.foot-links a:hover{color:var(--fg)}
+
+/* ---------- 复制提示 ---------- */
+.toast{
+  position:fixed;left:50%;bottom:32px;transform:translate(-50%,20px);z-index:90;
+  padding:10px 18px;border-radius:10px;background:rgba(20,24,38,.96);border:1px solid var(--line-2);
+  font-size:13px;color:var(--fg);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.9);
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1040px){
+  .hero-grid{grid-template-columns:1fr;gap:44px}
+  .forge{height:380px;max-width:560px}
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .card.wide{grid-column:span 2}
+  .scenes{grid-template-columns:repeat(2,1fr)}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .arch{grid-template-columns:1fr}
+  .gh-in{grid-template-columns:1fr}
+  .nav-links{display:none}
+}
+@media (max-width:680px){
+  .wrap{padding:0 18px}
+  .hero{padding:120px 0 64px}
+  .sec{padding:72px 0}
+  .cards,.scenes,.safe-grid{grid-template-columns:1fr}
+  .card.wide{grid-column:span 1}
+  .pipe-rail{grid-template-columns:1fr 1fr;gap:26px}
+  .pipe-rail::before{display:none}
+  .gh{padding:26px}
+  .float{display:none}
+  .stats{grid-template-columns:1fr}
+  .nav-right .btn-ghost{display:none}
+  .nav-in{height:60px;gap:10px}
+  .brand{font-size:15px}
+  .brand small{display:none}
+  /* 窄屏下终端卡的行为日志必须允许折行：行内是 nowrap，
+     320px 装不下一整行，会被卡片裁掉（裁在 overflow:hidden 里，连滚动都看不到）。 */
+  .forge{height:auto;max-width:none}
+  .forge-card{position:relative;top:0;right:0;bottom:0;left:0;height:auto;min-height:0}
+  .mc-body{font-size:10.8px}
+  .mc-row{white-space:normal;flex-wrap:wrap;row-gap:2px}
+  .mc-row .cmt{flex-basis:100%;opacity:.85}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="scroll-bar" id="bar"></div>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="铸版首页">
+      <span class="brand-mark" aria-hidden="true">铸</span>
+      <span>铸版<small>ZHUBAN</small></span>
+    </a>
+    <nav class="nav-links" id="navlinks" aria-label="主导航">
+      <a href="#pipeline">怎么用</a>
+      <a href="#features">能力</a>
+      <a href="#scenes">场景</a>
+      <a href="#tech">技术</a>
+      <a href="#security">安全</a>
+    </nav>
+    <div class="nav-right">
+      <a class="btn btn-ghost" href="https://github.com/kinghtxg/zhuban" target="_blank" rel="noopener">
+        <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.6 4.6 18.6 5 18.6 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn-primary" href="https://zb.kinghtxg.com/login">进入控制台</a>
+    </div>
+  </div>
+</header>
+<main id="top">
+
+<!-- ============================================================
+     首屏
+     ============================================================ -->
+<section class="hero">
+  <div class="aurora a"></div>
+  <div class="aurora b"></div>
+  <div class="aurora c"></div>
+  <canvas id="dust" aria-hidden="true"></canvas>
+
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="pill"><i class="dot"></i> 线上运行 <b>zb.kinghtxg.com</b> · Apache-2.0</span>
+
+      <h1 class="hero-title">
+        <span class="line">把 Word 模板</span>
+        <span class="line">变成一条<em>产线</em></span>
+      </h1>
+
+      <p class="hero-sub">
+        上传一份 docx 模板，交一批 JSON 数据。铸版负责渲染、转换 PDF、换图表数据、
+        盖签章、投递邮件，并把每一步写进不可篡改的审计链——
+        <strong>一次几千份，样式一分不差</strong>。
+      </p>
+
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="#pipeline">
+          看它怎么跑
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-ghost btn-lg" href="#github">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.6 4.6 18.6 5 18.6 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+          查看源码
+        </a>
+      </div>
+
+      <div class="hero-meta">
+        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> 模板与产物都不出你的服务器</span>
+        <span><svg class="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> 三个容器跑起来</span>
+      </div>
+    </div>
+
+    <div class="forge" id="forge">
+      <div class="forge-card" id="forgeCard">
+        <div class="mc-head">
+          <span class="mc-dots"><i></i><i></i><i></i></span>
+          <span class="mc-title">job / audit-report / 2026-Q3</span>
+          <span class="mc-badge" id="mcState">running</span>
+        </div>
+        <div class="mc-body" id="mcBody">
+          <div class="mc-line mc-row"><span class="k">template</span><span class="s">审计报告.docx</span><span class="cmt">v3.2 · 1 284 个槽位</span></div>
+          <div class="mc-line mc-row"><span class="k">records</span><span class="b">1 000</span><span class="cmt">校验通过 · 0 处缺失</span></div>
+          <div class="mc-line mc-row"><span class="k">format</span><span class="b">docx + pdf</span></div>
+          <div class="mc-line mc-row"><span class="k">charts</span><span class="e">12 张</span><span class="cmt">仅换数据，样式逐字节比对一致</span></div>
+          <div class="mc-line mc-row"><span class="k">render</span><span class="s" id="mcCount">0342 / 1000</span><span class="cmt">并发 4</span></div>
+          <div class="mc-line mc-row"><span class="k">seal</span><span class="e">引用签章</span><span class="cmt">出图时打印签署时间</span></div>
+          <div class="mc-line mc-row"><span class="k">deliver</span><span class="s">邮件 1000 / 1000</span></div>
+          <div class="mc-line mc-row"><span class="k">zip</span><span class="b">docx/ + pdf/</span><span class="cmt">两侧目录，解压即分层</span></div>
+          <div class="mc-line mc-row"><span class="k">signed</span><span class="b">直链 24h</span><span class="cmt">HMAC，可用不可猜</span></div>
+          <div class="mc-line mc-row"><span class="k">audit</span><span class="b">#00417</span><span class="cmt">已入哈希链</span><span class="mc-caret"></span></div>
+        </div>
+        <div class="mc-progress"><i id="mcBar"></i></div>
+        <div class="mc-foot"><span>elapsed 00:41</span><span id="mcFoot">渲染中…</span></div>
+      </div>
+
+      <div class="float f1">
+        <span class="ic f-ic-doc"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+        <span>docx <b>1 000</b></span>
+      </div>
+      <div class="float f2">
+        <span class="ic f-ic-pdf"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h1.5a1.5 1.5 0 0 1 0 3H8v-3zm0 3v2"/><path d="M14 18v-5h1a2.5 2.5 0 0 1 0 5h-1z"/></svg></span>
+        <span>pdf <b>1 000</b> <em style="font-style:normal;color:var(--fg-3)">· LibreOffice</em></span>
+      </div>
+      <div class="float f3">
+        <span class="ic f-ic-mail"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg></span>
+        <span>投递 <b>100%</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     怎么用（流水线）
+     ============================================================ -->
+<section class="sec" id="pipeline">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">一条链路</span>
+      <h2>四个动作，从模板到成品</h2>
+      <p>不需要写代码，也不需要拼 Office 自动化脚本。上传、填数、渲染、拿走——
+         中间那些容易出错的活（版式漂移、字体缺失、图表错位、进度丢失、投递失败）由铸版接管。</p>
+    </div>
+
+    <div class="pipe reveal">
+      <div class="pipe-rail">
+        <div class="node">
+          <div class="n-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#A9C0FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5"/><path d="M12 5v12"/></svg>
+          </div>
+          <h4>① 上传模板</h4>
+          <p>直接传你正在用的 .docx。扫描出全部变量槽位，标出必填项与类型。</p>
+          <span class="n-tag">扫描 · 变量识别</span>
+        </div>
+        <div class="node">
+          <div class="n-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#B79BFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h4"/><path d="M4 17v2a1 1 0 0 0 1 1h4"/><path d="M20 7V5a1 1 0 0 0-1-1h-4"/><path d="M20 17v2a1 1 0 0 1-1 1h-4"/><path d="M8 9h8M8 13h5"/></svg>
+          </div>
+          <h4>② 传数据</h4>
+          <p>一份 JSON，或一批（数组）。先校验再渲染：缺字段当次就报，不会产出半成品。</p>
+          <span class="n-tag">校验 · 字段级报错</span>
+        </div>
+        <div class="node">
+          <div class="n-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFB48F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.4"/></svg>
+          </div>
+          <h4>③ 异步渲染</h4>
+          <p>任务进队列，逐条渲染、逐条记状态。失败了能单条重试，不会整批重来。</p>
+          <span class="n-tag">队列 · 断点续跑</span>
+        </div>
+        <div class="node">
+          <div class="n-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#8FE3D6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          </div>
+          <h4>④ 拿走成品</h4>
+          <p>单个下载、打包 ZIP、签名直链，或直接发到收件人邮箱。每种方式都留审计。</p>
+          <span class="n-tag">ZIP · 直链 · 邮件</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     能力
+     ============================================================ -->
+<section class="sec" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">能力清单</span>
+      <h2>容易被当成「Office 自动化脚本」的事，这里都做成了产品</h2>
+      <p>下面九项里，有五项是真实项目里踩过坑才补上的（比如图表只换数据不动样式、
+         签章在现场出图、审计链可重算）。它们才是「能拿去生产用」和「能跑个 Demo」的区别。</p>
+    </div>
+
+    <div class="cards">
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#A9C0FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h4M20 7V5a1 1 0 0 0-1-1h-4M4 17v2a1 1 0 0 0 1 1h4M20 17v2a1 1 0 0 1-1 1h-4"/><path d="m8.5 12 2.5 2.5L16 9"/></svg></div>
+        <h3>变量渲染 <span class="badge-new">Jinja2</span></h3>
+        <p>底层是 docxtpl：<code>{{ 变量 }}</code>、循环、条件、过滤器全套可用。
+           变量能出现在正文、表格、页眉页脚、文本框里，不需要改造模板结构。</p>
+        <span class="c-tag">docxtpl · 槽位扫描 · 类型提示</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#B79BFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></div>
+        <h3>批量与断点重试</h3>
+        <p>一份数据是一份文档。任务按条记录状态，失败的单独重试，
+           已完成的不再重跑——5000 条跑到第 4000 条断网，不用从头再来。</p>
+        <span class="c-tag">任务队列 · 单条重试 · 进度可查</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#FFB48F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 3.5-4 3 2.5L20 6"/></svg></div>
+        <h3>图表只换数据，不动样式</h3>
+        <p>这是最容易做坏的一项：改图表数据时顺手把配色、字号、图例也改了。
+           铸版只重写 <code>numCache</code>/<code>strCache</code>，并用「剥掉数据节点后逐字节比对」
+           证明样式没动。</p>
+        <span class="c-tag">chart XML 双写 · style_fingerprint</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#FF9B78" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5 7 21l5-2.5L17 21l-1.5-7.5"/></svg></div>
+        <h3>签章在现场出图</h3>
+        <p>传「引用签章 + 字体编号 + 时间表达式」，输出那一刻才生成带签署时间的签字图。
+           不是把一张旧图贴上去——签名与时间同源，审计时分得清。</p>
+        <span class="c-tag">$sig 引用 · 时间表达式 · 字体继承</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#8CEFE6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+        <h3>在线编辑器</h3>
+        <p>在浏览器里改模板本身：A4 画布按窗口自适应，块级选中、变量面板、
+           实时预览（依赖 LibreOffice）。改完立刻成为新版本，可回滚。</p>
+        <span class="c-tag">A4 画布 · 版本 · 回滚</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#8CEFE6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg></div>
+        <h3>邮件投递</h3>
+        <p>SMTP 在服务端配置，收件人从数据里取。附件策略可选 docx / pdf / 两者 / 不附，
+           每封的回执状态都落库——投递是异步的，不能只看「接口没报错」。</p>
+        <span class="c-tag">附件策略 · 状态回执 · 域名白名单</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#A9C0FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg></div>
+        <h3>API Key 与回调</h3>
+        <p>给业务系统调用：API Key 带独立额度，任务完成回调可签名验真、可重放查询。
+           接入方不需要理解内部队列。</p>
+        <span class="c-tag">HMAC 签名 · 回调重放 · 额度控制</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#7FE9B8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></div>
+        <h3>哈希链审计</h3>
+        <p>谁在什么时候对哪份模板做了什么，一条一条串成哈希链。
+           可以全链重算验证——被改过一条，断点位置直接告诉你。</p>
+        <span class="c-tag">seq · prev_hash · 全链重算</span>
+      </article>
+
+      <article class="card reveal">
+        <div class="c-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#A9C0FF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3.5 6v6c0 5 3.6 8.6 8.5 10 4.9-1.4 8.5-5 8.5-10V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3>归属隔离</h3>
+        <p>任务 ID 是按日递增的，猜一个号就可能拿到别人的业务数据。
+           所以「能不能看到」按归属判定，非归属者一律 404（不是 403——403 等于承认它存在）。</p>
+        <span class="c-tag">任务 / 文档 / 直链 · 三条路径同口径</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     场景
+     ============================================================ -->
+<section class="sec" id="scenes">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">谁在用</span>
+      <h2>凡是「同一个格式、填不同内容、要几千份」的活</h2>
+      <p>这类工作的共同点是：模板是专家做的，内容是系统产的，量很大，错一份就要返工。
+         人肉填是最贵的方案。</p>
+    </div>
+
+    <div class="scenes">
+      <article class="scene reveal">
+        <span class="num">01</span>
+        <h4>安全审计报告</h4>
+        <p>扫描器出结论，报告要按客户模板出。一家一份，还带整改建议和签章。</p>
+        <ul><li>图表随结果换数</li><li>报告编号与日期自动填</li><li>签章 + 签署时间</li></ul>
+      </article>
+      <article class="scene reveal">
+        <span class="num">02</span>
+        <h4>合规与备案文书</h4>
+        <p>格式由监管定死，一个字都不能动，只能填。改错版式等于白做。</p>
+        <ul><li>版式零漂移</li><li>必填项先校验</li><li>批量子目录分包</li></ul>
+      </article>
+      <article class="scene reveal">
+        <span class="num">03</span>
+        <h4>合同与证书</h4>
+        <p>几百份合同、几千张证书，甲乙方与金额各不同，出完还要发出去。</p>
+        <ul><li>一人一份 PDF</li><li>邮件直投收件人</li><li>投递状态可查</li></ul>
+      </article>
+      <article class="scene reveal">
+        <span class="num">04</span>
+        <h4>内部报表</h4>
+        <p>周报月报季度报，数据在系统里，Word 模板在行政手里。</p>
+        <ul><li>API 触发，无人值守</li><li>定时批量跑</li><li>失败单条重试</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     技术
+     ============================================================ -->
+<section class="sec sec-dark" id="tech">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">怎么搭的</span>
+      <h2>Go 管业务，Python 管排版</h2>
+      <p>渲染是 CPU 活、生态在 Python（docxtpl + LibreOffice）；权限、队列、审计是业务活、
+         更适合 Go。两件事拆成两个服务，各自按需扩容，也各自能独立重启。</p>
+    </div>
+
+    <div class="arch">
+      <div class="arch-fig reveal" id="archFig">
+        <svg viewBox="0 0 420 300" role="img" aria-label="架构图：浏览器或业务系统经 Go API 进入任务队列，由 Python 渲染服务产出 docx 与 PDF 并落存储；PostgreSQL 保存元数据，认证支持 APSSO 单点登录，投递走 SMTP。">
+          <defs>
+            <linearGradient id="ag" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#3370ff"/><stop offset="1" stop-color="#7c5cff"/>
+            </linearGradient>
+            <marker id="ar" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
+              <path d="M0 0 10 5 0 10z" fill="#5A6588"/>
+            </marker>
+          </defs>
+
+          <!-- 主链路：浏览器 → API → 队列 → 渲染 → 产物 -->
+          <g stroke="#5A6588" stroke-width="1.3" fill="none" marker-end="url(#ar)">
+            <path d="M76 44h44"/>
+            <path d="M194 64v46"/>
+            <path d="M194 162v22"/>
+            <path d="M194 234v10"/>
+          </g>
+
+          <!-- 虚线：API 同时依赖库与外部服务（不是数据流，所以不带箭头） -->
+          <g stroke="#3E4866" stroke-width="1" stroke-dasharray="3 3" fill="none">
+            <path d="M260 44h22v136"/>
+            <path d="M282 78h4"/>
+            <path d="M282 129h4"/>
+            <path d="M282 180h4"/>
+          </g>
+
+          <g font-family="PingFang SC,Microsoft YaHei,sans-serif">
+            <rect x="8" y="26" width="68" height="36" rx="9" fill="#141826" stroke="rgba(255,255,255,.18)"/>
+            <text x="42" y="48" text-anchor="middle" font-size="11.5" fill="#D6DEF5">浏览器</text>
+
+            <rect x="128" y="26" width="132" height="38" rx="10" fill="url(#ag)" opacity=".18" stroke="rgba(124,92,255,.6)"/>
+            <text x="194" y="43" text-anchor="middle" font-size="12" fill="#EAEFFF" font-family="ui-monospace,monospace">Go API</text>
+            <text x="194" y="56" text-anchor="middle" font-size="9" fill="#A9B1C7">认证 · 权限 · 审计</text>
+
+            <rect x="128" y="112" width="132" height="50" rx="10" fill="#111529" stroke="rgba(51,225,211,.42)"/>
+            <text x="194" y="131" text-anchor="middle" font-size="11.5" fill="#8FE3D6">任务队列</text>
+            <text x="194" y="146" text-anchor="middle" font-size="9" fill="#A9B1C7">逐条状态 · 断点重试</text>
+
+            <rect x="128" y="184" width="132" height="50" rx="10" fill="#111529" stroke="rgba(255,122,69,.44)"/>
+            <text x="194" y="203" text-anchor="middle" font-size="11.5" fill="#FFB48F">Python 渲染</text>
+            <text x="194" y="218" text-anchor="middle" font-size="9" fill="#A9B1C7">docxtpl · LibreOffice</text>
+
+            <rect x="128" y="244" width="132" height="40" rx="10" fill="#141826" stroke="rgba(255,255,255,.18)"/>
+            <text x="194" y="261" text-anchor="middle" font-size="11.5" fill="#D6DEF5" font-family="ui-monospace,monospace">docx / pdf</text>
+            <text x="194" y="275" text-anchor="middle" font-size="9" fill="#7C86A3">本地存储 · 签名直链</text>
+
+            <rect x="286" y="61" width="126" height="34" rx="9" fill="#141826" stroke="rgba(255,255,255,.14)"/>
+            <text x="349" y="83" text-anchor="middle" font-size="11" fill="#A9B1C7" font-family="ui-monospace,monospace">PostgreSQL</text>
+
+            <rect x="286" y="112" width="126" height="34" rx="9" fill="#141826" stroke="rgba(255,255,255,.14)"/>
+            <text x="349" y="134" text-anchor="middle" font-size="11" fill="#A9B1C7">APSSO / OIDC</text>
+
+            <rect x="286" y="163" width="126" height="34" rx="9" fill="#141826" stroke="rgba(255,255,255,.14)"/>
+            <text x="349" y="185" text-anchor="middle" font-size="11" fill="#A9B1C7" font-family="ui-monospace,monospace">SMTP</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="arch-list">
+        <div class="arch-item reveal">
+          <span class="ai-k">渲染</span>
+          <div><h4>docxtpl 负责内容，LibreOffice 负责换算</h4>
+          <p>Jinja2 语义直接作用在 docx 的 XML 上，所以循环、条件、过滤器都能用；
+             转 PDF 交给无头 LibreOffice，避免「Word 里好看、服务器上跑版」。</p></div>
+        </div>
+        <div class="arch-item reveal">
+          <span class="ai-k">顺序</span>
+          <div><h4>图表数据必须在模板渲染之后写</h4>
+          <p>docxtpl 会整包重写 docx，先改图表会被覆盖——表现是「参数传了但图没变」。
+             这类顺序问题没有报错，只能靠知道它存在来避开。</p></div>
+        </div>
+        <div class="arch-item reveal">
+          <span class="ai-k">部署</span>
+          <div><h4>三个容器，一条 compose</h4>
+          <p>postgres / render / web。单机可跑，反代后只暴露一个端口；
+             Docker 构建已切国内 apt 与 pip 源，LibreOffice 那层从 8 分钟降到 33 秒。</p></div>
+        </div>
+        <div class="arch-item reveal">
+          <span class="ai-k">接入</span>
+          <div><h4>复用你已有的身份体系</h4>
+          <p>不自建账号中心：可接 APSSO（OIDC + PKCE）、可用本地账号，
+             也可以给业务系统发 API Key。三套入口，同一套权限模型。</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat reveal"><div class="v" data-count="500" data-suffix="+">0</div><div class="l">自动化用例</div><div class="s">go test + pytest</div></div>
+      <div class="stat reveal"><div class="v" data-count="100" data-suffix=" 条">0</div><div class="l">路由逐条验收匿名访问</div><div class="s">遍历 chi 路由表</div></div>
+      <div class="stat reveal"><div class="v" data-count="88" data-suffix="%">0</div><div class="l">认证与队列包覆盖率</div><div class="s">go tool cover 实测</div></div>
+      <div class="stat reveal"><div class="v" data-count="3" data-suffix=" 个">0</div><div class="l">容器跑起来</div><div class="s">compose up -d</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     安全
+     ============================================================ -->
+<section class="sec" id="security">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow">安全</span>
+      <h2>输出的是带签章的正式文书，所以每条路径都得想清楚</h2>
+      <p>下面这些不是「已实现的安全特性」清单，而是上线前逐条验过、并且写进了回归测试的判定标准。</p>
+    </div>
+
+    <div class="safe-grid">
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.4"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+        <div><h4>四类对象都按归属判定</h4>
+        <p>模板、任务、文档、签名直链。非归属者一律 404，避免用状态码反过来确认「这个 ID 存在」。</p></div>
+      </div>
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg></span>
+        <div><h4>直链是 HMAC 签名，不是随机串</h4>
+        <p>签名带有效期，可过期、可拒绝伪造。<code>/s/&lt;token&gt;</code> 本身就是凭证，不依赖登录态。</p></div>
+      </div>
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg></span>
+        <div><h4>回调地址防 SSRF</h4>
+        <p>默认拒绝私网与元数据地址（<code>169.254.169.254</code> 等），要开内网回调得显式配置白名单。</p></div>
+      </div>
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span>
+        <div><h4>导出的 CSV 中和公式</h4>
+        <p>审计日志里的显示名由用户可控，导出后被 Excel 打开可能执行公式。
+           所以以 <code>= + - @</code> 开头的单元格会被加前缀中和。</p></div>
+      </div>
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <div><h4>登录失败按账号锁定</h4>
+        <p>同一账号连续失败 5 次锁 5 分钟，锁定期间正确口令同样拒绝；同 IP 另有一层频次上限。</p></div>
+      </div>
+      <div class="safe reveal">
+        <span class="s-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+        <div><h4>改密与禁号会立即失效会话</h4>
+        <p>改密码踢掉其它设备、禁用账号撤销全部会话。
+           只清浏览器 cookie 的服务端会话仍然有效，所以必须撤服务端那一条。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     GitHub
+     ============================================================ -->
+<section class="sec" id="github">
+  <div class="wrap">
+    <div class="gh reveal">
+      <div class="gh-in">
+        <div>
+          <span class="eyebrow">开源</span>
+          <h3 style="margin-top:14px">源码在 GitHub，Apache-2.0</h3>
+          <p>整个服务都在这个仓库里：Go 主服务、Python 渲染服务、React 前端、
+             部署脚本与验收脚本。没有闭源模块，也没有「企业版才有」的功能开关。</p>
+
+          <div class="repo">
+            <span class="repo-url" id="repoUrl">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.8 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17.6 4.6 18.6 5 18.6 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+              github.com/kinghtxg/zhuban
+            </span>
+            <button class="btn btn-ghost" type="button" id="copyBtn" style="height:40px">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+              复制
+            </button>
+          </div>
+
+          <div class="repo-actions">
+            <a class="btn btn-primary" href="https://github.com/kinghtxg/zhuban" target="_blank" rel="noopener">
+              <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 2 3.1 6.4 7 1-5 5 1.2 7-6.3-3.4L5.7 21.4 7 14.4l-5-5 7-1z"/></svg>
+              去点个 Star
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/kinghtxg/zhuban#readme" target="_blank" rel="noopener">部署文档</a>
+          </div>
+        </div>
+
+        <div class="gh-side">
+          <div class="gh-stat"><span>许可</span><b>Apache-2.0</b></div>
+          <div class="gh-stat"><span>主服务</span><b>Go</b></div>
+          <div class="gh-stat"><span>渲染</span><b>Python</b></div>
+          <div class="gh-stat"><span>前端</span><b>React + TS</b></div>
+          <div class="gh-stat"><span>数据库</span><b>PostgreSQL</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     收尾
+     ============================================================ -->
+<section class="final">
+  <div class="wrap">
+    <h2 class="reveal">下一批报告，<span class="grad-text">让机器去填</span></h2>
+    <p class="reveal">装好就能用，先跑一份试试——不满意的地方，源码就在你手上。</p>
+    <div class="hero-cta reveal">
+      <a class="btn btn-primary btn-lg" href="https://zb.kinghtxg.com/login">进入控制台</a>
+      <a class="btn btn-ghost btn-lg" href="https://github.com/kinghtxg/zhuban" target="_blank" rel="noopener">阅读源码</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-in">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="brand-mark" style="width:26px;height:26px;border-radius:8px;font-size:13px" aria-hidden="true">铸</span>
+      <span>铸版 ZHUBAN · 把 Word 模板变成产线</span>
+    </div>
+    <div class="foot-links">
+      <a href="https://zb.kinghtxg.com/login">控制台</a>
+      <a href="https://github.com/kinghtxg/zhuban" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/kinghtxg/zhuban/issues" target="_blank" rel="noopener">反馈</a>
+      <span>Apache-2.0</span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast">已复制仓库地址</div>
+
+<script src="landing.js" defer></script>
+
+</body>
+</html>

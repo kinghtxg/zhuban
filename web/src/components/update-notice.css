@@ -1,0 +1,208 @@
+/* 右下角「有新版本」提示。
+   刻意不复用 Arco 的 Notification：那个是"浮在所有东西上方的一次性通知"，
+   两秒后自己消失。升级提示需要**待在那里等人处理**，而且带一个次级动作
+   （忽略此版本），塞进 Notification 会变成一个没法点第二次的弹窗。 */
+
+.un-card {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  /* 900：高于页面内容与侧边栏，**低于** Arco 的 Modal/Drawer（1001）。
+     压在弹窗之上会挡住"确定/取消"，而一个升级提示没有任何理由
+     让正在填表的人点不到按钮。 */
+  z-index: 900;
+  width: 336px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 14px 16px 14px;
+  border-radius: var(--app-radius-panel, 10px);
+  background: #fff;
+  border: 1px solid var(--color-border-2);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  animation: un-in 0.42s cubic-bezier(0.22, 0.68, 0, 1) both;
+}
+
+/* 顶部一道品牌渐变：这是全站唯一用渐变的地方（品牌方块之外），
+   让它在浅色界面里一眼被认出是「铸版自己的东西」而不是浏览器的提示。 */
+.un-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--brand-gradient);
+}
+
+@keyframes un-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 尊重系统的"减少动态效果"：只留淡入，不做位移。 */
+@media (prefers-reduced-motion: reduce) {
+  .un-card {
+    animation: un-fade 0.25s linear both;
+  }
+  @keyframes un-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+.un-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding-right: 18px; /* 给关闭按钮让位 */
+}
+
+.un-mark {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--brand-gradient);
+  box-shadow: 0 3px 10px rgba(51, 112, 255, 0.28);
+  margin-top: 1px;
+}
+
+.un-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-1);
+  line-height: 1.5;
+}
+
+.un-ver {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.un-ver b {
+  /* 必须 rgb(var())：--primary-6 是「R, G, B」三元组，直接当颜色用是无效值，
+     会静默退回继承色。主按钮曾因此变成白底白字——整颗按钮看不见。 */
+  color: rgb(var(--primary-6));
+  font-weight: 600;
+}
+
+.un-ver i {
+  font-style: normal;
+  color: var(--color-text-4);
+}
+
+.un-notes {
+  margin: 9px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--color-text-2);
+  /* 发布说明可能是长文（Markdown 渲染不了，这里只当纯文本预览）：
+     截断成三行，想看全文点「查看更新」。 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.un-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.un-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background 0.16s,
+    color 0.16s,
+    border-color 0.16s;
+}
+
+.un-btn-primary {
+  color: #fff;
+  background: rgb(var(--primary-6));
+}
+
+.un-btn-primary:hover:not(:disabled) {
+  background: rgb(var(--primary-5));
+}
+
+.un-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.un-btn-text {
+  color: var(--color-text-3);
+  background: transparent;
+}
+
+.un-btn-text:hover {
+  color: var(--color-text-1);
+  background: var(--color-fill-2);
+}
+
+.un-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-3);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background 0.16s,
+    color 0.16s;
+}
+
+.un-close:hover {
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+}
+
+/* 窄屏：贴边占满，别在右下角缩成一小块 */
+@media (max-width: 480px) {
+  .un-card {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+  }
+}

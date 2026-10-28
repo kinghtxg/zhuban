@@ -1,0 +1,23 @@
+# 构建上下文排除项
+**/node_modules/
+web/node_modules/
+web/dist/assets/
+web/dist-verify/
+volumes/
+data/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+render-service/tmp/
+render-service/.pytest_cache/
+.git/
+.idea/
+.vscode/
+*.zip
+.env
+
+# 生产配置含真实密钥，绝不进入构建上下文
+deploy/
+# 验收/测试过程产物
+verify/
+fonts/

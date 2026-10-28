@@ -1,0 +1,455 @@
+/**
+ * 页面级布局规范（Layout & Composition）
+ * 规范基线：Arco Design · Arco Pro 后台模板
+ *
+ * 解决的问题：
+ *   此前每个页面在自己的 JSX 里写内联 style 拼布局（grid、卡片、间距），
+ *   导致同类元素在不同页面尺寸/圆角/阴影各不相同——这是「看起来乱」的主因。
+ *   本文件把「页头 / 工具栏 / 数据卡片 / 网格卡片 / 统计块 / 空状态」固化为
+ *   可直接复用的类，页面只需要组合，不再各自造样式。
+ *
+ * 使用约束：
+ *   - 只允许使用 tokens.css 里的间距档位（--space-*）与圆角令牌
+ *   - 禁止在页面组件里写死像素、色值、阴影；确需微调时在本文件加修饰类
+ *   - 结构顺序固定：页头 → 工具栏 → 内容（数据卡片 / 卡片网格 / 空状态）
+ */
+
+/* ============================================================
+   一、页头
+   ============================================================ */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.page-head-main {
+  min-width: 0;
+}
+
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  /* 与标题首行基线对齐（标题 20px/1.4 ≈ 28px 高，按钮 32px） */
+  padding-top: 2px;
+}
+
+/* ============================================================
+   二、工具栏（筛选 / 搜索 / 批量操作）
+   —— 紧贴页头，底边距固定 12，控件间距 8
+   ============================================================ */
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* 工具栏内的控件高度对齐（Arco 默认 32），不写死宽度，由页面按语义指定 */
+.page-toolbar .arco-input-search,
+.page-toolbar .arco-select,
+.page-toolbar .arco-picker {
+  flex-shrink: 0;
+}
+
+/* 右侧对齐的补充操作（如「刷新」「列设置」） */
+.page-toolbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ============================================================
+   三、数据卡片（表格容器）
+   —— 白底 + 10px 圆角 + 浅描边，表格贴边裁切，分页收进内边距
+   ⚠️ 表格容器【不加阴影】：表格是「工作面」，一屏里常有多张，
+   浮动阴影会让相邻卡片互相投暗、观感发脏。阴影只留给可点击的内容卡片。
+   ============================================================ */
+.data-card {
+  background: var(--app-bg-panel);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel);
+  overflow: hidden;
+}
+
+/* 卡片内的表格：去掉自身外框，靠容器裁切圆角 */
+.data-card .arco-table-container {
+  border: none;
+  border-radius: 0;
+}
+
+/* 来源列：小圆点 + 文字，不用胶囊。
+   胶囊会让「分类」和「结论」在视觉上等重，而这一页要优先看到的是状态。 */
+.source-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--color-text-2);
+}
+.source-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* 表格上方的筛选行（目前只有 API Key 用）。
+   卡片自己不设 padding（Arco 表格自带内边距），所以这一行得自己补，
+   否则输入框会紧贴卡片左上角。底部留 0：表格自己顶上还有间距，
+   两边都给就会多出一段空白。 */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) 0;
+}
+
+/* 表头：浅灰底 + 中灰字，与内容行形成层次 */
+.data-card .arco-table-th {
+  background: var(--color-fill-1);
+  color: var(--app-text-body);
+  font-weight: var(--font-weight-medium);
+}
+
+/* 最后一行不画下边框，避免与卡片底边重叠出双线 */
+.data-card .arco-table-tr:last-child .arco-table-td {
+  border-bottom: none;
+}
+
+/* 分页：收进卡片右下，与表格留出呼吸感 */
+.data-card .arco-table-pagination {
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+/* 表格内操作列：按钮间距统一，不换行 */
+.cell-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+}
+
+/* 单元格内的次要说明行（如版本号、进度明细） */
+.cell-sub {
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-1);
+  line-height: 1.5;
+}
+
+.cell-strong {
+  color: var(--app-text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 单元格内的异常值（如失败条数），比正文更醒目但不喧宾夺主 */
+.cell-danger {
+  color: rgb(var(--danger-6));
+}
+
+/* ============================================================
+   四、卡片网格（模板库 / 签章资源库）
+   ---- auto-fit 而非 auto-fill：
+   auto-fill 会为「填不满的那一列」保留空轨道，只有 3 个卡片时右边会空出
+   一条与卡片等宽的虚位，看起来像漏渲染。auto-fit 让空轨道塌缩，
+   现有卡片把整行铺满。两者在「卡片数 ≥ 列数」时行为完全一致，
+   差别只在这种稀疏场景，所以选 auto-fit 没有代价。
+   ============================================================ */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+/* 普通内容卡片：白底、10px 圆角、极淡投影（可点击整卡时加 .is-hover）
+   悬停上浮 4px 是「刻本」的签名手感：位移 + 阴影加深 + 描边变实，
+   三件事同时发生才像「被拿起来」；只加阴影会显脏，只加位移会显得在抖。 */
+.grid-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 168px;
+  background: var(--app-bg-panel);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.grid-card.is-hover {
+  cursor: pointer;
+}
+
+/* 所有卡片都有「描边变实 + 阴影加深」的轻反馈：告诉用户这块是可交互区域。
+   真正的整卡可点（.is-hover）才追加 translateY 上浮——上浮＝「可以拿起来」，
+   对只能点内部按钮的卡片摆出这个姿态是误导。 */
+.grid-card:hover {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.grid-card.is-hover:hover {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-4px);
+}
+
+/* 键盘 Tab 到卡片时给同样的抬起反馈，不只在鼠标悬停时才有 */
+.grid-card.is-hover:focus-within {
+  border-color: var(--app-border-strong);
+  box-shadow: var(--shadow-hover);
+}
+
+/* 卡片头部：左缩略图 + 右信息 */
+.grid-card-head {
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* 卡片标题：既是文本也是「进入详情」的按钮，所以要把按钮外观全部抹掉。
+   只改外观，不动可点区域——焦点环保留，键盘用户需要看见自己在哪。 */
+button.grid-card-title {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.grid-card-title:hover {
+  color: rgb(var(--primary-6));
+}
+
+button.grid-card-title:focus-visible {
+  outline: 2px solid rgb(var(--primary-6));
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.grid-card-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.grid-card-title {
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+/* 卡片底部操作条：与内容用一条弱分隔线隔开，主次按钮靠左，更多靠右
+   margin-top:auto 让同排卡片（含「上传新模板」虚线卡）的操作条底部对齐 */
+.grid-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-1);
+}
+
+.grid-card-actions .grid-card-actions-end {
+  margin-left: auto;
+}
+
+/* 新增卡片（虚线）——与大厂后台的「+ 新建」卡片一致 */
+.grid-card-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 168px;
+  border: 1px dashed var(--color-border-3);
+  border-radius: var(--app-radius-panel);
+  background: transparent;
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-2);
+  cursor: pointer;
+  transition: color var(--transition-base), border-color var(--transition-base),
+    background var(--transition-base);
+}
+
+.grid-card-add:hover {
+  color: rgb(var(--primary-6));
+  border-color: rgb(var(--primary-4));
+  /* ⚠️ 不能用 rgb(var(--primary-1) / 40%)：Arco 主色是逗号分隔三元组，
+     斜杠语法只接受空格分隔的 RGB，会整条声明失效。用 Arco 现成的 light-1。 */
+  background: var(--color-primary-light-1);
+}
+
+.grid-card-add-icon {
+  font-size: 20px;
+}
+
+/* 缩略图容器：统一比例，内部图片铺满，缺图时显示占位图标 */
+.thumb-box {
+  position: relative;
+  width: 64px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: var(--app-radius-control);
+  border: 1px solid var(--color-border-2);
+  background: var(--color-fill-1);
+  overflow: hidden;
+}
+
+.thumb-box img {
+  /* 绝对定位是叠层的前提：图片要能把底下的占位图标整个盖住，
+     而不是和它并排挤在 80px 高的盒子里。 */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: var(--color-bg-2);
+}
+
+.thumb-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-4);
+  font-size: 20px;
+}
+
+/* ============================================================
+   五、统计块（系统设置等只读指标）
+   ============================================================ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+/* 指标项正好 3n 个时用 3 列，避免最后一行只落一个卡片（3+3 优于 4+2） */
+.stat-grid.is-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 指标块：白底 + 描边。
+   ⚠️ 不能再用 color-fill-1 做底——页面底色本身就是 fill-1（#F7F8FA），
+   同色叠加会让 6 个指标块在页面上彻底"隐身"（实测过一次，整块区域像没渲染）。
+   白底 + 1px 描边既保住「灰底白块」的层次，又不需要阴影（它们是只读信息）。 */
+.stat-block {
+  background: var(--app-bg-panel);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-control);
+  padding: var(--space-3) var(--space-4);
+}
+
+.stat-block-label {
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-2);
+}
+
+.stat-block-value {
+  color: var(--app-text-title);
+  font-size: var(--font-size-title-3);
+  font-weight: var(--font-weight-bold);
+  margin-top: var(--space-1);
+  line-height: var(--line-height-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   六、区块与空状态
+   ============================================================ */
+.section {
+  margin-top: var(--space-4);
+}
+
+.section-title {
+  font-size: var(--font-size-title-3);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+  margin-bottom: var(--space-3);
+}
+
+/* 空状态：图标 + 说明 + 主操作，垂直居中且不贴边 */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+}
+
+/* 整页级空状态：补一层白底容器，避免直接浮在页面底色上显得散 */
+.empty-block.empty-surface {
+  background: var(--app-bg-panel);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel);
+  padding: var(--space-12) var(--space-6);
+}
+
+.empty-block-desc {
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-2);
+}
+
+/* 投递调试台：未选模板时的占位块。
+   高度与编辑器一致（320px），避免"选模板前后页面高度跳一下"。 */
+.playground-empty {
+  height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  border: 1px dashed var(--color-border-2);
+  border-radius: var(--app-radius-control);
+  background: var(--color-fill-1);
+  color: var(--color-text-3);
+}
+
+.playground-empty-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-2);
+}
+
+.playground-empty-sub {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.playground-empty code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  background: var(--color-fill-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}

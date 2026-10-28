@@ -1,0 +1,53 @@
+name: pages
+
+# 把官网（site/）发布到 GitHub Pages。
+#
+# 为什么单独一个 workflow：site/ 是纯静态、零构建的（一个 index.html + 一个
+# landing.js，favicon 是内联 data URI），不需要 Node、不需要打包，直接把目录
+# 交出去就行。它同时也被 //go:embed 内嵌成产品未登录时的首页 —— 同一份文件
+# 两种用法，所以这里不改内容、不注入任何东西。
+#
+# 站内链接在源文件里写的是官方实例的绝对地址（https://zb.kinghtxg.com/...），
+# 因为独立托管时相对路径没有对应路由。被产品自己提供时，服务端会用
+# EXTERNAL_BASE_URL 替换成本实例地址。所以挂到 Pages 上点「进入控制台」会
+# 跳到官方实例，这是预期行为。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只跑一个部署，但不取消进行中的（避免把一次发布切成两半）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 发布快照每次都是全新历史，浅克隆足够
+          fetch-depth: 1
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          # 直接发 site/ 目录：访问 https://<owner>.github.io/<repo>/ 就是
+          # site/index.html，landing.js 在同级，相对路径照常工作。
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
