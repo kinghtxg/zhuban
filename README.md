@@ -45,7 +45,7 @@
 ```bash
 cp .env.example .env       # 至少填 POSTGRES_PASSWORD / SIGNED_URL_SECRET / AUTH_SECRET
 #   密钥生成：openssl rand -hex 32
-#   可选：写 APP_VERSION=3.4.0 固定版本，不写则跟随 latest
+#   可选：写 APP_VERSION=3.4.1 固定版本，不写则跟随 latest
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
