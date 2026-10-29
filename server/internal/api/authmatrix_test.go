@@ -253,7 +253,7 @@ func TestSetup_RefusedWhenAlreadyInitialized(t *testing.T) {
 	s.DB.Create(&models.User{ID: "u_first", Username: "first", Role: "admin", Status: "active"})
 
 	req := httptest.NewRequest("POST", "/api/v1/auth/setup",
-		strings.NewReader(`{"username":"second","password":"Zhuban@2026Adm1n"}`))
+		strings.NewReader(`{"username":"second","password":"unitTestPassw0rd"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

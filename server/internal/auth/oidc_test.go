@@ -597,7 +597,7 @@ func TestOIDC_UnbindRequiresPassword(t *testing.T) {
 		t.Fatalf("没有密码时应拒绝解绑，实际 err=%v", err)
 	}
 
-	hash, err := HashPassword("Zhuban@2026Adm1n")
+	hash, err := HashPassword("unitTestPassw0rd")
 	if err != nil {
 		t.Fatal(err)
 	}

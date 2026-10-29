@@ -124,7 +124,7 @@ func bootstrapFixture(t *testing.T, cfg *config.Config) (*Manager, func() int64)
 
 // 配了 ADMIN_USERNAME/PASSWORD 时建出 active admin，且密码能用来登录。
 func TestBootstrapAdmin_CreatesActiveAdmin(t *testing.T) {
-	cfg := &config.Config{AdminUsername: "boss", AdminPassword: "Zhuban@2026Adm1n"}
+	cfg := &config.Config{AdminUsername: "boss", AdminPassword: "unitTestPassw0rd"}
 	m, count := bootstrapFixture(t, cfg)
 
 	BootstrapAdmin(m.DB, m.Cfg)
@@ -142,14 +142,14 @@ func TestBootstrapAdmin_CreatesActiveAdmin(t *testing.T) {
 	if !u.HasPassword() {
 		t.Error("内置管理员必须带密码哈希，否则密码登录进不去")
 	}
-	if ok, err := VerifyPassword("Zhuban@2026Adm1n", u.PasswordHash); err != nil || !ok {
+	if ok, err := VerifyPassword("unitTestPassw0rd", u.PasswordHash); err != nil || !ok {
 		t.Errorf("存下来的哈希校验不过：ok=%v err=%v", ok, err)
 	}
 }
 
 // 已有用户时不重复建号：重启服务不能把管理员再来一遍（用户名唯一会直接冲突）。
 func TestBootstrapAdmin_IdempotentWhenUsersExist(t *testing.T) {
-	cfg := &config.Config{AdminUsername: "boss", AdminPassword: "Zhuban@2026Adm1n"}
+	cfg := &config.Config{AdminUsername: "boss", AdminPassword: "unitTestPassw0rd"}
 	m, count := bootstrapFixture(t, cfg)
 
 	BootstrapAdmin(m.DB, m.Cfg)
