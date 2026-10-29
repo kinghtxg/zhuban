@@ -5,30 +5,11 @@
   'use strict';
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---------- 滚动进度与导航状态 ---------- */
-  var nav = document.getElementById('nav');
-  var bar = document.getElementById('bar');
-  var links = [].slice.call(document.querySelectorAll('#navlinks a'));
-  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
-
-  function onScroll(){
-    var y = window.scrollY || document.documentElement.scrollTop;
-    var h = document.documentElement.scrollHeight - window.innerHeight;
-    bar.style.width = (h > 0 ? Math.min(100, (y / h) * 100) : 0) + '%';
-    nav.classList.toggle('scrolled', y > 12);
-    // 当前区块高亮：取「已经进入视口上部 40%」的最后一个
-    var idx = -1;
-    for (var i = 0; i < sections.length; i++){
-      var el = sections[i];
-      if (el && el.getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
-    }
-    links.forEach(function(a, i){ a.classList.toggle('active', i === idx); });
-  }
-  window.addEventListener('scroll', onScroll, {passive:true});
-  window.addEventListener('resize', onScroll);
-  onScroll();
-
-  /* ---------- 滚动入场 ---------- */
+  /* ---------- 滚动入场（必须第一个跑） ----------
+     它决定正文能不能被看见：.reveal 默认 opacity:0，只有拿到 .in 才现身。
+     2026-10-29 出过一次事故——下面的「导航高亮」因为一个外链 href 抛 SyntaxError，
+     把整个 IIFE 带走，于是首屏以下 38 个区块永远停在 opacity:0，
+     用户看到的是「官网内容没了好多」。**内容可见性不能依赖后面任何一段代码不犯错。** */
   var reveals = [].slice.call(document.querySelectorAll('.reveal'));
   if (!('IntersectionObserver' in window) || reduce){
     reveals.forEach(function(el){ el.classList.add('in'); });
@@ -47,6 +28,34 @@
     }, {rootMargin:'0px 0px -12% 0px', threshold:0.08});
     reveals.forEach(function(el){ io.observe(el); });
   }
+
+  /* ---------- 滚动进度与导航状态 ---------- */
+  var nav = document.getElementById('nav');
+  var bar = document.getElementById('bar');
+  var links = [].slice.call(document.querySelectorAll('#navlinks a'));
+  // 导航里混着外链（「文档」→ 线上手册）。querySelector('https://…') 会抛
+  // SyntaxError: not a valid selector —— 只把 #锚点 当区块目标，其余一律 null。
+  var sections = links.map(function(a){
+    var href = a.getAttribute('href') || '';
+    return href.charAt(0) === '#' ? document.querySelector(href) : null;
+  });
+
+  function onScroll(){
+    var y = window.scrollY || document.documentElement.scrollTop;
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (h > 0 ? Math.min(100, (y / h) * 100) : 0) + '%';
+    nav.classList.toggle('scrolled', y > 12);
+    // 当前区块高亮：取「已经进入视口上部 40%」的最后一个
+    var idx = -1;
+    for (var i = 0; i < sections.length; i++){
+      var el = sections[i];
+      if (el && el.getBoundingClientRect().top <= window.innerHeight * 0.4) idx = i;
+    }
+    links.forEach(function(a, i){ a.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll);
+  onScroll();
 
   /* ---------- 数字滚动 ---------- */
   function countUp(el){

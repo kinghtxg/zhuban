@@ -455,6 +455,12 @@ footer{border-top:1px solid var(--line);padding:40px 0 46px;position:relative;z-
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
   .reveal{opacity:1;transform:none}
 }
+/* 脚本没跑起来（被拦、404、或抛异常后整页失效）时，正文必须照常可读。
+   .reveal 的 opacity:0 只是动画起点，不是内容的默认状态。
+   scripting 媒体特性 Chrome 120+ / Safari 17+ 支持，不支持的浏览器忽略这条。 */
+@media (scripting:none){
+  .reveal{opacity:1;transform:none}
+}
 </style>
 </head>
 <body>
