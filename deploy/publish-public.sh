@@ -64,6 +64,10 @@ INTERNAL_DOCS=(
   'docs/本轮能力补充-*.md'
   'docs/诊断-*.md'
   'docs/Git仓库使用说明.md'
+  # 部署/运维只有一个入口：线上手册 https://kb.kinghtxg.com/s/book-162。
+  # 这份文档内容本身不敏感，但留着就是「第二个运维入口」——哪天线上手册与它说的
+  # 不一样，用户不知道该信哪个。任何「装/升/备/排错」的改动只改线上手册那一份。
+  'docs/部署与运维.md'
 )
 rm -rf "$TMP/docs/prd"
 for pat in "${INTERNAL_DOCS[@]}"; do
