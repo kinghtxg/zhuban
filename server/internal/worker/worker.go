@@ -437,6 +437,62 @@ func (w *Worker) cleanup(ctx context.Context) {
 		}
 		w.DB.Model(j).Updates(map[string]interface{}{"expired": true, "zip_path": ""})
 	}
+
+	w.cleanupDeletedTemplates()
+}
+
+// cleanupDeletedTemplates 回收软删模板留在磁盘上的版本文件与缩略图。
+//
+// handleDeleteTemplate 是软删：只改数据库（code 释放成 deleted:<id>、enabled=false、
+// 写 deleted_at），那里的注释承诺「磁盘占位交给保留期清理」。但清理协程此前只扫
+// jobs / documents，templates/{tpl}/ 与 thumbnails/ 从来没被回收过——每删一个模板
+// 就在磁盘上永久多两个孤儿文件，删得越多攒得越多。
+//
+// 为什么不在删的那一刻删：保留期内 POST /documents/{id}/regenerate 还要读回版本
+// 文件重新渲染，当场删会把「重新生成」打成 500。所以按 deleted_at 起算，过了
+// RetentionDays 才真正回收，语义与 job 的 expires_at 一致。
+//
+// 只回收磁盘，不动数据库软删行：历史 job / document 还引用着 template_id，
+// 物理删行会让「生成记录」里的模板名变空白，审计链断掉。
+func (w *Worker) cleanupDeletedTemplates() {
+	// Root 为空或是相对路径时，filepath.Join 会退化成相对路径，
+	// os.RemoveAll 就变成删进程当前目录。宁可这批不清，也不冒这个险。
+	if w.Store == nil || w.Store.Root == "" || !filepath.IsAbs(w.Store.Root) {
+		return
+	}
+	cutoff := time.Now().AddDate(0, 0, -w.Cfg.RetentionDays)
+
+	var tpls []models.Template
+	// Unscoped：软删行被 GORM 默认过滤，不绕过就一行都查不到。
+	err := w.DB.Unscoped().
+		Where("deleted_at IS NOT NULL AND deleted_at < ?", cutoff).
+		Find(&tpls).Error
+	if err != nil {
+		log.Printf("[worker] 查询待回收模板失败: %v", err)
+		return
+	}
+
+	reclaimed := 0
+	for i := range tpls {
+		t := &tpls[i]
+		dir := filepath.Join(w.Store.Root, "templates", t.ID)
+		// 缩略图按 tpl_<id>_ver_<vid>.png 命名，一个模板可能有多个版本
+		thumbs, _ := filepath.Glob(filepath.Join(w.Store.Root, "thumbnails", t.ID+"_*.png"))
+		if _, statErr := os.Stat(dir); os.IsNotExist(statErr) && len(thumbs) == 0 {
+			continue // 上一轮已经清过，别每小时重复 log
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			log.Printf("[worker] 删除模板目录失败 %s: %v", t.ID, err)
+			continue
+		}
+		for _, f := range thumbs {
+			os.Remove(f)
+		}
+		reclaimed++
+	}
+	if reclaimed > 0 {
+		log.Printf("[worker] 已回收 %d 个软删模板的磁盘占位（保留期 %d 天）", reclaimed, w.Cfg.RetentionDays)
+	}
 }
 
 // BuildFilename 供 API 层在创建 document 时计算文件名。
