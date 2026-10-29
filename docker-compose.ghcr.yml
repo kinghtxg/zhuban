@@ -43,10 +43,13 @@ services:
       # 图片回调默认不允许内网地址（SSRF 防护）。私有化部署里图片常在内网，
       # 确实需要时再打开，并配合下面的 CALLBACK_HOST_ALLOWLIST 收窄范围。
       IMAGE_ALLOW_PRIVATE: "${CALLBACK_ALLOW_PRIVATE:-false}"
-      TMP_DIR: "/tmp/zhuban"
+      # 必须与镜像内已存在且属主为 appuser 的目录一致（/tmp/docforge）。
+      # 写一个镜像里不存在的路径（例如 /tmp/zhuban）时，命名卷会由 root 创建，
+      # 容器以 uid 1000 运行时 PDF 转换与预览页图全部 Permission denied。
+      TMP_DIR: "/tmp/docforge"
       FONT_IMPORT_DIR: "/usr/share/fonts/imported"
     volumes:
-      - render-tmp:/tmp/zhuban
+      - render-tmp:/tmp/docforge
       # 自制/已授权的字体放这里。**不要放 Windows 自带字体**：
       # 那些是商业授权字体，随镜像或仓库分发属于侵权。
       - ./fonts:/usr/share/fonts/custom:ro
