@@ -1,0 +1,801 @@
+/**
+ * docforge 全局样式
+ * 规范基线：Arco Design（字节跳动）
+ *
+ * 结构约定：
+ *   1. 基础层：html/body 重置
+ *   2. 骨架层：Layout / Header / Sider / Content 定制（基于 Arco Layout 组件）
+ *   3. 导航层：Menu 定制（顶部 horizontal + 侧边 vertical，基于 Arco Menu 组件）
+ *   4. 业务层：页面容器、登录页、工作台、代码块等
+ *
+ * ⚠️ 禁止事项：
+ *   - 禁止在此文件定义新的颜色变量（一律用 tokens.css 或 Arco 原生变量）
+ *   - 禁止写死色值（var(--color-text-3) / var(--color-border-2) 之类），必须用语义变量
+ *   - 禁止再手搓导航项样式，导航一律用 Arco Menu 组件 + 此处定制
+ */
+
+@import './tokens.css';
+@import './page.css';
+@import './login.css';
+
+/* ============================================================
+   一、基础层
+   ============================================================ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-body-3);
+  line-height: var(--line-height-base);
+  background-color: var(--app-bg-page);
+  color: var(--app-text-title);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   一之内、交互反馈（与「刻本」统一的三条手感约定）
+   ============================================================ */
+
+/* 按压反馈：所有按钮按下时轻微内缩。
+   这是刻本最有辨识度的一处手感——点击「有回应」，而不是毫无变化的死板。
+   只作用于 button 元素（Arco 的按钮也是 button），不影响用 div 模拟的可点区域。 */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 焦点环统一为 3px 柔环。键盘 Tab 时可见，鼠标点击时不出现（:focus-visible） */
+input:focus-visible,
+textarea:focus-visible,
+.arco-btn:focus-visible,
+.arco-input-wrapper:focus-within {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* 过渡时序全局收敛：颜色类小属性走 120ms，位移/阴影类走 200ms。
+   Arco 默认大量使用 `transition: all .1s`，会让阴影和位移一起抖；
+   这里只对「会变的属性」显式声明，避免 all。 */
+.arco-btn,
+.arco-input,
+.arco-input-wrapper,
+.arco-select-view,
+.arco-tag {
+  transition: background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+/* Arco 卡片质感统一：圆角 8px、弱描边
+   ⚠️ 必须带 .arco-card-bordered 提高优先级：
+   Arco 的 .arco-card-bordered 用 var(--color-border)（不存在的变量）声明边框，
+   变量无效时 CSS 回退到 currentColor，表现为【纯黑 1px 直角边框】。
+   只写 .arco-card 优先级（0,1,0）低于 .arco-card-bordered（0,2,0），覆盖不掉。 */
+.arco-card,
+.arco-card.arco-card-bordered {
+  border-radius: var(--app-radius-panel);
+  border: 1px solid var(--color-border-2);
+  box-shadow: none;
+}
+
+/* 卡片内边距与标题层级对齐 Arco Pro */
+.arco-card-header {
+  border-bottom: 1px solid var(--color-border-1);
+  height: 48px;
+}
+
+.arco-card-header .arco-card-header-title {
+  font-size: var(--font-size-title-3);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+}
+
+/* ============================================================
+   二、骨架层（Arco Layout）
+   ============================================================ */
+.app-shell {
+  min-height: 100vh;
+  background: var(--app-bg-page);
+}
+
+/* 顶部通栏 56px
+   半透明白 + 毛玻璃：滚动时内容从顶栏下方「透」上来，层级感来自模糊而不是
+   一道实线，这是刻本的顶栏做法。@supports 兜底：不支持 backdrop-filter 的
+   环境（部分旧 WebView）回退为实色白，避免顶栏变透明后文字叠在一起。 */
+.app-header {
+  height: var(--layout-header-height);
+  padding: 0 var(--space-6);
+  background: var(--app-bg-panel);
+  border-bottom: 1px solid var(--app-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .app-header {
+    background: rgba(255, 255, 255, 0.85);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.app-brand-name {
+  font-size: var(--font-size-title-3);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.2px;
+  color: var(--app-text-title);
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.app-header-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-body-2);
+  color: var(--app-text-body);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.app-header-action:hover {
+  color: rgb(var(--primary-6));
+}
+
+.app-user-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.app-user-name {
+  font-size: var(--font-size-body-3);
+  color: var(--app-text-title);
+}
+
+.app-user-caret {
+  font-size: 12px;
+  color: var(--app-text-caption);
+}
+
+/* 用户下拉菜单头：显示身份，替代此前顶栏里与姓名重复的角色 Tag */
+.app-user-menu-head {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--color-border-1);
+  margin-bottom: var(--space-1);
+}
+
+.app-user-menu-name {
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+}
+
+.app-user-menu-role {
+  margin-top: 2px;
+  font-size: var(--font-size-body-1);
+  color: var(--app-text-caption);
+}
+
+/* 主体行 */
+.app-body {
+  min-height: 0;
+}
+
+/* 二级菜单侧栏 */
+.app-sider {
+  background: var(--app-bg-panel);
+  border-right: 1px solid var(--app-border);
+  position: sticky;
+  top: var(--layout-header-height);
+  height: calc(100vh - var(--layout-header-height));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Arco Sider 内部还有一层 children 容器，不设成 flex 的话
+   我们的 .app-sider-foot（margin-top:auto 贴底）拿不到父级弹性上下文 */
+.app-sider .arco-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-sider-foot {
+  /* 贴底展示，作为侧栏收口；上方留 auto 让它永远压在最下面 */
+  margin-top: auto;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  font-size: var(--font-size-body-1);
+  color: var(--app-text-caption);
+  line-height: var(--line-height-base);
+}
+
+/* 内容列 */
+.app-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.app-crumbbar {
+  height: var(--layout-crumb-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--layout-content-padding);
+}
+
+.app-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* ============================================================
+   三、导航层（Arco Menu 定制）
+   —— 顶部一级域 / 侧边二级菜单，统一走 Arco Menu，
+      这里只做品牌化外观覆盖，不重写行为
+   ============================================================ */
+
+/* --- 顶部一级导航 --- */
+.app-nav-top.arco-menu-horizontal {
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-nav-top.arco-menu-horizontal .arco-menu-inner {
+  padding: 0;
+  overflow: visible;
+}
+
+.app-nav-top.arco-menu-horizontal .arco-menu-item,
+.app-nav-top.arco-menu-horizontal .arco-menu-pop-header {
+  height: var(--layout-header-height);
+  line-height: var(--layout-header-height);
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-body-3);
+  color: var(--app-text-body);
+  background: transparent;
+}
+
+.app-nav-top.arco-menu-horizontal .arco-menu-item:hover,
+.app-nav-top.arco-menu-horizontal .arco-menu-pop-header:hover {
+  background: transparent;
+  color: var(--app-text-title);
+}
+
+/* 选中态：主色文字 + 底部 2px 指示条
+ *
+ * 只能有一条。Arco 横向 Menu 在 item 内部也会渲染一个
+ * .arco-menu-selected-label（height:3px; bottom:-14px），它的 -14px 是拿来
+ * 抵消 .arco-menu-horizontal .arco-menu-inner 的 padding:14px 20px 的。
+ * 上面把 inner 的 padding 归零后，那 -14px 就把 Arco 的条推到 item 之外，
+ * 于是与下面的 ::after 并存 —— 视觉上就是两条蓝杠。
+ * 保留自己的条（贴 item 底边、随 item 宽度，符合 tab 语义），隐藏 Arco 的。
+ */
+.app-nav-top.arco-menu-horizontal .arco-menu-item.arco-menu-selected {
+  background: transparent;
+  color: rgb(var(--primary-6));
+  font-weight: var(--font-weight-bold);
+}
+
+.app-nav-top.arco-menu-horizontal .arco-menu-selected-label {
+  display: none;
+}
+
+.app-nav-top.arco-menu-horizontal .arco-menu-item.arco-menu-selected::after {
+  content: '';
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: rgb(var(--primary-6));
+}
+
+/* --- 侧边二级菜单 --- */
+.app-nav-side.arco-menu-vertical {
+  background: transparent;
+  padding: var(--space-3) var(--space-2);
+  flex: 1;
+}
+
+.app-nav-side.arco-menu-vertical .arco-menu-inner {
+  padding: 0;
+}
+
+.app-nav-side.arco-menu-vertical .arco-menu-item {
+  position: relative;
+  height: 38px;
+  line-height: 38px;
+  padding: 0 var(--space-3);
+  margin-bottom: 2px;
+  border-radius: var(--app-radius-control);
+  font-size: var(--font-size-body-2);
+  color: var(--app-text-body);
+  background: transparent;
+  overflow: visible;
+  transition: background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.app-nav-side.arco-menu-vertical .arco-menu-item:hover {
+  background: var(--app-bg-hover);
+  color: var(--app-text-title);
+}
+
+.app-nav-side.arco-menu-vertical .arco-menu-item.arco-menu-selected {
+  background: var(--app-bg-selected);
+  color: rgb(var(--primary-6));
+  font-weight: var(--font-weight-bold);
+}
+
+/* 选中项左侧 3px 竖条 */
+.app-nav-side.arco-menu-vertical .arco-menu-item.arco-menu-selected::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: rgb(var(--primary-6));
+}
+
+/* 侧栏分组标题 */
+.app-sider-label {
+  font-size: var(--font-size-body-1);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--app-text-caption);
+  padding: var(--space-1) var(--space-3) var(--space-2);
+}
+
+/* ============================================================
+   四、业务层
+   ============================================================ */
+
+/* 品牌标识（蓝紫渐变方块 + 字符）—— 全站唯一允许的品牌渐变
+   几何取自刻本：9px 圆角（不是圆角=半径/2 的胶囊，也不是 4px 的硬方），
+   这个中间的圆角值是「克制但有现代感」的关键，太小显旧、太大显软。 */
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-size: 16px;
+  font-weight: var(--font-weight-bold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-brand);
+  user-select: none;
+  letter-spacing: 0;
+}
+
+/* 登录页品牌区用大号：44px / 11px 圆角，与刻本登录页的标一致 */
+.brand-mark.lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  font-size: 22px;
+  box-shadow: 0 10px 26px rgba(51, 112, 255, 0.35);
+}
+
+/* --- 页面容器 --- */
+/* 内容区左右 24px、上下 24px 起，超宽屏居中限宽 1440：
+   不设上限时 2K/4K 上表格列会被拉得很散，视线要在同一行里横跳。
+
+   ⚠️ box-sizing 必须显式声明为 border-box：
+   本项目没有全局 * { box-sizing: border-box } 重置，这里一旦写
+   width:100% + padding，盒子会按 content-box 计算 → 1220 的容器里长出
+   1268 的页面，右侧溢出 48px，页头主按钮被视口裁掉一截。
+   （实测：appScroll.clientW=1220 / scrollW=1268，按钮 right=1464 > 1440） */
+.df-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--layout-content-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--layout-content-padding);
+}
+
+.df-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  gap: var(--space-4);
+}
+
+.df-page-title {
+  font-size: var(--font-size-title-1);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+  line-height: var(--line-height-tight);
+  margin: 0;
+}
+
+.df-page-sub {
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-2);
+  margin-top: var(--space-1);
+}
+
+/* 登录页样式已独立到 login.css（左右分栏，参考「刻本」） */
+
+/* --- 工作台三栏 --- */
+.df-studio {
+  display: flex;
+  gap: var(--space-3);
+  height: calc(100vh - 250px);
+  padding: var(--space-2) var(--layout-content-padding) var(--space-4);
+}
+
+/* Monaco 容器：编辑器自身是纯白底，与页面同色会"消失"，
+   必须给一层描边和圆角把编辑区框出来 */
+.studio-editor {
+  margin: 0 var(--space-3) var(--space-3);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-control);
+  overflow: hidden;
+  background: var(--color-bg-2);
+}
+
+.df-studio-col {
+  background: var(--app-bg-panel);
+  border-radius: var(--app-radius-panel);
+  border: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.df-studio-col-left {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.df-studio-col-mid {
+  flex: 1;
+  min-width: 380px;
+}
+
+.df-studio-col-right {
+  width: 420px;
+  flex-shrink: 0;
+}
+
+.df-studio-col-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--app-border);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-title-3);
+  color: var(--app-text-title);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.df-studio-col-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+}
+
+/* 预览图 */
+.df-preview-img {
+  width: 100%;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-control);
+  margin-bottom: var(--space-2);
+  display: block;
+}
+
+/* 表格卡片缩略图 */
+.df-thumb {
+  width: 56px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-control);
+  background: var(--color-fill-1);
+}
+
+/* 代码块卡片（接入卡片 / 帮助速查） */
+.df-codeblock {
+  background: #282c34;
+  color: #abb2bf;
+  border-radius: var(--app-radius-control);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-family-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow: auto;
+  position: relative;
+}
+
+/* ============================================================
+   五、滚动条
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-fill-4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-4);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   图表数据（工作台左栏入口 + 编辑抽屉网格）
+   --------------------------------------------------------------------------- */
+.studio-sub-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--app-text-caption);
+  margin-bottom: 6px;
+}
+.studio-sub-title span {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--color-fill-2);
+  color: var(--app-text-caption);
+  font-size: 11px;
+  text-align: center;
+}
+
+.studio-chart-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-1);
+}
+.studio-chart-row:last-child { border-bottom: none; }
+
+.studio-chart-info { flex: 1; min-width: 0; }
+.studio-chart-name {
+  font-size: 13px;
+  color: var(--app-text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-chart-meta {
+  font-size: 11.5px;
+  color: var(--app-text-caption);
+  margin-top: 2px;
+}
+
+/* 未选签章的提示：用弱化的斜体，避免和已选的绿色 Tag 混淆 */
+.studio-chart-empty {
+  font-style: italic;
+  color: var(--app-text-caption);
+}
+
+/* --- 签章选择器 --- */
+.sign-picker-hint {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--app-text-caption);
+  background: var(--color-fill-1);
+  border-radius: var(--app-radius-control);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.sign-picker-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.sign-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.sign-picker-card {
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-card);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--color-bg-2);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.sign-picker-card:hover {
+  border-color: rgb(var(--primary-6));
+  box-shadow: var(--app-shadow-card);
+}
+
+.sign-picker-thumb {
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-fill-1);
+  border-radius: var(--app-radius-control);
+  overflow: hidden;
+}
+.sign-picker-thumb img {
+  max-width: 92%;
+  max-height: 92%;
+  object-fit: contain;
+}
+
+.sign-picker-name {
+  font-size: 13px;
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sign-picker-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sign-picker-size {
+  font-size: 11.5px;
+  color: var(--app-text-caption);
+}
+
+/* --- 字体管理 --- */
+.font-list {
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-card);
+  overflow: hidden;
+}
+
+.font-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-1);
+}
+.font-row:last-child { border-bottom: none; }
+
+.font-row-main { flex: 1; min-width: 0; }
+
+.font-row-name {
+  font-size: 13px;
+  color: var(--app-text-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-row-meta {
+  font-size: 11.5px;
+  color: var(--app-text-caption);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 图表数值网格 */
+.chart-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-card);
+  max-height: 52vh;
+}
+.chart-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.chart-grid th,
+.chart-grid td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border-1);
+  border-right: 1px solid var(--color-border-1);
+  text-align: left;
+  vertical-align: middle;
+}
+.chart-grid th:last-child,
+.chart-grid td:last-child { border-right: none; }
+.chart-grid tr:last-child td { border-bottom: none; }
+.chart-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-fill-1);
+  font-weight: 500;
+  color: var(--app-text-title);
+}
+.chart-grid tbody tr:hover td { background: var(--color-fill-1); }
+.chart-grid-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--app-text-caption);
+  margin-top: 3px;
+}
+.chart-grid-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--app-text-caption);
+}
+.chart-grid-hint code {
+  background: var(--color-fill-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-family-mono);
+  font-size: 11.5px;
+}
+
+/* 下拉菜单里的分隔线。Arco Menu 没有 Divider 子组件，自绘一条。
+ * 左右各留 8px 比撑满更接近原生菜单的观感（Arco 自己的 secondary 菜单也这么做）。 */
+.menu-divider {
+  height: 1px;
+  margin: 6px 8px;
+  background: var(--color-border-2);
+}
