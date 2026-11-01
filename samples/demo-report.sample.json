@@ -1,0 +1,161 @@
+{
+  "报告标题": "铸版能力演示报告",
+  "副标题": "一份模板，演示全部占位符语法",
+  "报告编号": "DEMO-2026-0001",
+  "出具单位": "示例科技有限公司",
+  "编制人": "张演示",
+  "出具日期": {
+    "$date": "today",
+    "format": "%Y 年 %m 月 %d 日"
+  },
+  "审核人": "",
+  "风险等级": "高",
+  "rich_摘要": {
+    "type": "markdown",
+    "content": "本报告用于演示铸版的占位符能力，**不针对任何真实系统**。\n\n- 标量、默认值、日期表达式\n- 表格行循环、整段循环、嵌套循环、条件块\n- 图片、二维码、富文本、图表换数\n- 页眉、页脚、页码、目录\n\n把这份 JSON 改几个字再生成一次，就能看出哪些地方是「跟着数据走」的。"
+  },
+  "image_banner": {
+    "type": "image",
+    "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAgCAIAAABiouoDAAAARElEQVR42u3QQQkAAAgEsOtkMft/tIF/YbAES/VwiAJBggQJEiRIkCAECRIkSJAgQYIQJEiQIEGCBAlCkCBBggQJ+msB0WyZHjjeJKIAAAAASUVORK5CYII=",
+    "width": 60,
+    "height": 20
+  },
+  "image_签字示例": {
+    "type": "image",
+    "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANwAAABICAIAAAASzwyDAAABPElEQVR42u3bSw6CMBSGUXbiPtymC8ahM4Kkj7+95wtjwdsTYlWOUwrrMAJBKUEpKCUoBaUEpaCUoJSgFJQSlIJSglJQSlAKSglKCUpBKUEpKCUoBaUEpQSloJSgFJTSsihf78+dw6pAOZng/cNqQTlfIaZQjrPYz7QVLY1yMBFMoXzoI3DbxOvmKMNX14fXQijXXarxey+Iu6PcdeKkLonSWBkNQmmCviIIQmle070a1A+lAaUZrY7SRJKBVkRpBKsArYgSiCV0VkFJwHI6C+2+5cYJpdw4oUQTSqEJJZ076IQSzbh3ASWacVcOJZpxlwplOZohOi9+UIWSzhSLNjpoDtX51z+hoESzF9DHJ4KSzmZGW70glDrTHuaEUh2BPrsGKNUSaJPzQqm4oBSUEpSCUoJSUEpQCkppdl83aDfJ8rAAWwAAAABJRU5ErkJggg==",
+    "width": 42,
+    "height": 14
+  },
+  "image_印章示例": {
+    "type": "image",
+    "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAIAAAAErfB6AAADQElEQVR42u3dQXLkMAxDUdwn99/PzTRXSLpaIgB+VvYm8aKOY7ctHaq6RAQAUwBTAFMAUwBTAFMAA0wBTAFMAXyt/v38/OkH4CrOPeQCtRtboHZjC9puZuHaLS1ou5kFbTezoO1mFrTdzEK321jQdjOrWDexkxJg/xBrmBWtS8N2wLlJhXaurIw6zvkLgfsuEqVMJP8siu+FNABvuCXnPKM8Jz+B5Tms0O0eWVajnoqymt0I+BRVObCn7uDhBkPQnrUbcY3THdj5Y9nhuO8z0RLdQeDZZMaAZ098zE+7HIH9T5itGngWkZboOgCPBAUwwBW6JsDv49ISXR/gx6G9A7a6fBh0LXMSOPerNm793EsPYIArdA2B32R4HfjYlH9XRsCJd3mjgT/uWUuWry3w7TC1ZPkWAH/WtpYsX2fgq5ECDHCFrjnwvWABBrhC1x/4UrwAAwwwwBEPKMQ1+Ro4/QmUGuA/9a8lyzcF+Os5AwwwwBuAy96nkQ78+xG0ZPkGAX83bYABBhhggAEG2Bi44y0qZcC/nEJLlm8W8BczBxhggAEGGGCAFwBv2ETnZVYAAwwwwAADzEkWJ1kAAwwwwAADDPAlYG4XPtb9JvDhhn/m8gUYYIABBhhggCuAeXTF7RT68PBZ9/IFGGCAAeYVDrZ/gA8vYelevofXKHUvX4ABBngV8OFlpFG6AANcZMwLwQEG+C/dsCmHQ55sq9O8fA8bY3Uv38PWdt3L97A5ZffyPWwv260LMMBFxmzxfrfR8Vg9O3EHDjI2bONBXEpsOhf4fVAAA9xibNXAs4iUPkAK8FQ4Y8DvUzY5dDCwubHDcd9novF5nsU9e8SpKNQ62DiwSQjqHi/i36Gr4xsB1xhbzS63OaOZDUfWtoG3DSvbsYOYnWeU+fwd79MYHE0RQeR+VX18IhFK9xSKSyfiboFP58pNyvmKo8/vpUI/5W5n59+hNfC9ED8L1KeTKuCzY6Od2YSHgbuZHbK1AK40NgnWBbiJ2SpSL+B0ZsMwHYETmW1j9AVOYTYP0B3YVjoltxhgH+asxMKAp7BzUwoGrrx0DPAt8tYcaoEpgAGmAKYApgCmAKYApgAGmAKYApiyqf9Z9v9X6c5NywAAAABJRU5ErkJggg==",
+    "width": 30,
+    "height": 30
+  },
+  "qr_报告编号": {
+    "type": "qrcode",
+    "text": "https://github.com/kinghtxg/zhuban",
+    "size": 24
+  },
+  "指标": [
+    {
+      "名称": "交付文档总数",
+      "数值": "1,286 份",
+      "环比": "+18.4%"
+    },
+    {
+      "名称": "平均生成耗时",
+      "数值": "2.3 秒",
+      "环比": "-31.0%"
+    },
+    {
+      "名称": "一次通过率",
+      "数值": "98.7%",
+      "环比": "+1.2pp"
+    },
+    {
+      "名称": "人工返工次数",
+      "数值": "6 次",
+      "环比": "-72.7%"
+    }
+  ],
+  "交付清单": [
+    {
+      "名称": "《系统验收报告》",
+      "完成": true,
+      "备注": "含签章与骑缝"
+    },
+    {
+      "名称": "《缺陷整改清单》",
+      "完成": true,
+      "备注": "按等级分组"
+    },
+    {
+      "名称": "《上线检查表》",
+      "完成": true,
+      "备注": ""
+    },
+    {
+      "名称": "《运维移交手册》",
+      "完成": false,
+      "备注": "待补附录"
+    }
+  ],
+  "问题分组": [
+    {
+      "分组": "账号与权限",
+      "条目": [
+        {
+          "问题": "后台存在弱口令账号",
+          "等级": "高",
+          "建议": "强制改密并启用复杂度策略"
+        },
+        {
+          "问题": "离职人员账号未回收",
+          "等级": "中",
+          "建议": "接入统一身份源，按状态同步"
+        }
+      ]
+    },
+    {
+      "分组": "数据与备份",
+      "条目": [
+        {
+          "问题": "备份未做恢复演练",
+          "等级": "高",
+          "建议": "每月恢复一次并留存记录"
+        },
+        {
+          "问题": "日志保留期不足 6 个月",
+          "等级": "低",
+          "建议": "调整保留策略"
+        }
+      ]
+    }
+  ],
+  "chart_季度销售额": {
+    "categories": [
+      "Q1",
+      "Q2",
+      "Q3",
+      "Q4"
+    ],
+    "series": [
+      {
+        "name": "2025 年",
+        "values": [
+          120,
+          180,
+          150,
+          220
+        ]
+      },
+      {
+        "name": "2026 年",
+        "values": [
+          140,
+          210,
+          190,
+          260
+        ]
+      }
+    ]
+  },
+  "chart_收入构成": {
+    "categories": [
+      "产品交付",
+      "订阅服务",
+      "技术支持"
+    ],
+    "series": [
+      {
+        "name": "占比",
+        "values": [
+          55,
+          30,
+          15
+        ]
+      }
+    ]
+  }
+}
