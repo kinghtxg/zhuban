@@ -59,8 +59,8 @@ export default function TemplateDetail() {
     }
   };
 
-  // 当前激活页签：显式取 /templates/:id/ 之后的第一段，只认四个合法页签，其余回退概览。
-  const TAB_KEYS = ['overview', 'playground', 'versions', 'variables'];
+  // 当前激活页签：显式取 /templates/:id/ 之后的第一段，只认合法页签，其余回退概览。
+  const TAB_KEYS = ['overview', 'fill', 'playground', 'versions', 'variables'];
   const seg = location.pathname.replace(/^\/templates\/[^/]+\//, '');
   const activeTab = TAB_KEYS.includes(seg) ? seg : 'overview';
 
@@ -87,7 +87,22 @@ export default function TemplateDetail() {
           <Button icon={<IconEdit />} onClick={() => navigate(`/editor/${tpl.id}`)}>
             在线编辑
           </Button>
-          <Button type="primary" icon={<IconPlayCircle />} onClick={() => navigate(`/templates/${tpl.id}/playground`)}>
+          {/* 「填写录入」是给要用这份模板出文档的人的主路径，所以它是主按钮；
+              「试运行」留着，但那是调模板时用的，不该抢主位。 */}
+          <Button
+            type="primary"
+            icon={<IconFile />}
+            disabled={!tpl.enabled}
+            title={tpl.enabled ? '按问卷填写内容并生成文档' : '模板已停用，启用后才能生成'}
+            onClick={() => navigate(`/templates/${tpl.id}/fill`)}
+          >
+            填写录入
+          </Button>
+          <Button
+            type="outline"
+            icon={<IconPlayCircle />}
+            onClick={() => navigate(`/templates/${tpl.id}/playground`)}
+          >
             试运行
           </Button>
           <Popconfirm
@@ -105,6 +120,7 @@ export default function TemplateDetail() {
       <Tabs key={`${id}-${activeTab}`} activeTab={activeTab} onChange={(k) => navigate(`/templates/${id}/${k === 'overview' ? '' : k}`)}
         style={{ padding: '0 24px', marginTop: 8 }}>
         <TabPane key="overview" title="概览" />
+        <TabPane key="fill" title="填写录入" />
         <TabPane key="playground" title="试运行" />
         <TabPane key="versions" title="版本历史" />
         <TabPane key="variables" title="变量与资源" />

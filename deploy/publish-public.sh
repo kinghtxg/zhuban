@@ -17,6 +17,9 @@
 #   VERSION=3.4.14 ./deploy/publish-public.sh      # 发布并推 tag，自动出镜像
 #   ./deploy/publish-public.sh --version 3.4.14    # 同上
 #   ./deploy/publish-public.sh --dry-run           # 只看会推什么，不推
+#   SNAPSHOT_DIR=/tmp/zbsnap ./deploy/publish-public.sh
+#                                                  # 只产快照不推送：github.com:443
+#                                                  # 挂掉时用它，再走 Git Data API
 set -euo pipefail
 
 REPO_URL="${PUBLIC_REPO_URL:-https://github.com/kinghtxg/zhuban.git}"
@@ -53,9 +56,15 @@ fi
 # 交给 tar 会被反斜杠搞成"C\:..."，报 Cannot open。
 BASE=/tmp
 [[ "${TMPDIR:-}" == /* ]] && BASE="$TMPDIR"
-TMP="$BASE/zbpub.$$"
+TMP="${SNAPSHOT_DIR:-$BASE/zbpub.$$}"
 mkdir -p "$TMP"
-trap 'rm -rf "$TMP"' EXIT
+# 只产快照时**不能**删目录——调用方拿它去走 Git Data API（github.com:443 挂掉时的兜底路径）。
+# 3.4.16 那次是临时用 sed 把 push 和 trap 切掉的，改完还得记得改回来，太脏。
+if [[ -z "${SNAPSHOT_DIR:-}" ]]; then
+  trap 'rm -rf "$TMP"' EXIT
+else
+  echo "→ 快照模式：产出到 $TMP（不推送）"
+fi
 
 echo "→ 导出 HEAD（$(git rev-parse --short HEAD)）到临时目录…"
 git archive --format=tar HEAD | tar -x -C "$TMP"
@@ -192,6 +201,14 @@ git commit -q -m "release: ${SUMMARY}
 if [[ $DRY -eq 1 ]]; then
   echo "→ --dry-run：将要推送的内容如下（未实际推送）"
   git log --stat --oneline | head -30
+  exit 0
+fi
+
+# 快照模式到此为止：内容已导出、已过泄露扫描与 Office 元数据剥离，
+# 后面换 Git Data API 推送（见 docs 里的排错记录）。
+if [[ -n "${SNAPSHOT_DIR:-}" ]]; then
+  echo "✓ 快照就绪：$TMP"
+  echo "  下一步用 Git Data API 推（blobs 只传有变化的文件 → trees 带 base_tree → commits → PATCH refs）"
   exit 0
 fi
 

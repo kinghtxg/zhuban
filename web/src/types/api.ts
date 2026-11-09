@@ -97,6 +97,11 @@ export interface TemplateVariable {
   fields?: TemplateVariable[];
   // condition 专用
   expression?: string;
+  // 枚举：扫描器从 examples/enums 带出来的可选值。有值就不该让人手敲
+  // （「风险等级」写成「高」还是「高风险」差一个字，条件段就不生效）。
+  enum?: string[];
+  // 由服务端签章授权注入的变量（sigauth）：保留条目但不给示例、不要求填
+  system_resolved?: boolean;
   // chart 专用（chartdata 扫描产物）：图表类型/标题/结构，供前端渲染数据表格
   chart_kind?: string;
   chart_kind_name?: string;

@@ -26,34 +26,10 @@ import PreviewPane from '@/components/PreviewPane';
 import EmptyState from '@/components/EmptyState';
 
 /**
- * 从数据里的值取出资源 ID。
- *
- * 签章的值有两种合法形态：
- *   "sig_xxxx"                                        ← 老形态：直接引用资源
- *   {"$sig":"sig_xxxx","with_timestamp":true,...}      ← 参数对象：现场出图（可带签署时间）
- * 只认字符串会让参数对象在界面上显示成「未选择」——用户明明填了，界面说没填。
+ * 签章值的读取工具放在 utils/signvalue：录入页也要用，而从本文件 import 会把
+ * Monaco 一起拉进那个页面。函数说明见该文件。
  */
-export function assetIdOf(v: unknown): string {
-  if (typeof v === 'string') return v;
-  if (v && typeof v === 'object') {
-    const o = v as Record<string, unknown>;
-    const id = o.$sig ?? o.$seal;
-    if (typeof id === 'string') return id;
-  }
-  return '';
-}
-
-/** 值里是否带了现场出图参数（时间/字体/署名）。用来在界面上标一下，别让人忘了自己开过。 */
-export function renderParamsOf(v: unknown): string[] {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return [];
-  const o = v as Record<string, unknown>;
-  const out: string[] = [];
-  if (o.with_timestamp || o.timestamp) out.push('带签署时间');
-  if (o.font) out.push('指定字体');
-  if (o.signer_name) out.push('指定署名');
-  if (o.width_mm || o.height_mm) out.push('指定尺寸');
-  return out;
-}
+import { assetIdOf, renderParamsOf, replaceAsset } from '@/utils/signvalue';
 
 export default function StudioPage() {
   // 新路由 /templates/:id/playground（参数名 id）；旧路由 /studio/:templateId（参数名 templateId）。
@@ -162,13 +138,8 @@ export default function StudioPage() {
     >;
     const prev = base[name];
     // 「换一个签章」只该换资源，不该顺手把现场出图参数（时间/字体/署名）清掉——
-    // 那种丢失用户看不见，生成出来才发现时间没了。
-    if (prev && typeof prev === 'object' && !Array.isArray(prev) && (('$sig' in prev) || ('$seal' in prev))) {
-      const marker = '$seal' in prev ? '$seal' : '$sig';
-      base[name] = { ...(prev as Record<string, unknown>), [marker]: assetId };
-    } else {
-      base[name] = assetId;
-    }
+    // 那种丢失用户看不见，生成出来才发现时间没了。规则在 replaceAsset 里统一。
+    base[name] = replaceAsset(prev, assetId);
     setJsonText(JSON.stringify(base, null, 2));
   };
 

@@ -35,6 +35,7 @@ import TemplateDetail from '@/pages/template/TemplateDetail';
 import TemplateOverview from '@/pages/template/TemplateOverview';
 import TemplateVersions from '@/pages/template/TemplateVersions';
 import TemplateVariables from '@/pages/template/TemplateVariables';
+import TemplateFill from '@/pages/template/TemplateFill';
 const EditorPage = lazy(() => import('@/pages/editor/EditorPage'));
 import '@/styles/editor.css';
 
@@ -115,6 +116,9 @@ export default function App() {
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/templates/:id" element={<TemplateDetail />}>
             <Route index element={<TemplateOverview />} />
+            {/* fill 在 playground 之前：录入是给人填的，试运行是给调试的人看的，
+                常用入口排在前面 */}
+            <Route path="fill" element={<TemplateFill />} />
             <Route path="playground" element={<StudioPage />} />
             <Route path="versions" element={<TemplateVersions />} />
             <Route path="variables" element={<TemplateVariables />} />

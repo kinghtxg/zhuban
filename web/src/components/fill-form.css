@@ -1,0 +1,205 @@
+/* 录入表单（问卷式）。
+   
+   为什么要有独立样式而不是内联：这是一张会长到几十行的表单，行距、对齐、
+   分区留白稍微不一致就会显得"像随手拼的"，而表单的可信度很大程度上来自
+   "看起来是系统的、不是临时的"。
+
+   一条原则：**标签在上、控件在下**。左右两列看起来更紧凑，但一旦遇到
+   多行文本、循环卡片、长字段名（"其中：财政拨款结转结余"这种），左列要么
+   被撑变形要么被截断，而业务表单里长字段名是常态。 */
+
+.df-fill-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 分区小标题：一条细线 + 小字。不用大标题，避免一张表单出现七八个"标题"抢注意力 */
+.df-fill-section {
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--app-border-light);
+  font-size: var(--font-size-body-1);
+  font-weight: var(--font-weight-medium);
+  color: var(--app-text-caption);
+  letter-spacing: 0.02em;
+}
+
+.df-fill-section:first-child {
+  margin-top: 0;
+}
+
+.df-fill-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.df-fill-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  font-size: var(--font-size-body-2);
+  color: var(--app-text-body);
+}
+
+.df-fill-name {
+  color: var(--app-text-title);
+  font-weight: var(--font-weight-medium);
+  word-break: break-all;
+}
+
+/* 必填星号用品牌色而不是红色：红色留给"填错了"，否则满屏红星，
+   真正出错的地方反而不显眼 */
+.df-fill-req {
+  color: rgb(var(--primary-6));
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.df-fill-hint {
+  font-size: var(--font-size-body-1);
+  color: var(--app-text-caption);
+  line-height: 1.5;
+}
+
+/* "未选择 / 未填写"：要比普通提示更醒目一点，但不能像报错 */
+.df-fill-missing {
+  color: var(--color-text-3);
+  font-style: normal;
+}
+
+.df-fill-err {
+  font-size: var(--font-size-body-1);
+  color: rgb(var(--danger-6));
+  line-height: 1.5;
+}
+
+/* ---- 循环块 ---- */
+
+.df-fill-loop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.df-fill-loop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  /* 循环块的标题是这一段的锚点：多行列表卷动后还能认出"我在填哪张表"，
+     所以给它一条左侧标记线，和普通字段区分开 */
+  border-left: 3px solid rgb(var(--primary-5));
+  padding-left: var(--space-2);
+}
+
+.df-fill-item {
+  border-radius: var(--app-radius-control) !important;
+}
+
+/* Arco Card body 默认 16px，卡片里再套一行行字段时太松，收一点 */
+.df-fill-item .arco-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* 嵌套循环（一层）缩进，靠左侧细线表示从属关系 */
+.df-fill-item .df-fill-loop {
+  padding-left: var(--space-2);
+  border-left: 1px dashed var(--app-border);
+}
+
+.df-fill-thumb {
+  max-width: 120px;
+  max-height: 90px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-control);
+  object-fit: contain;
+  background: var(--color-fill-1);
+}
+
+/* ---- 页面骨架（录入页） ---- */
+
+.df-fill-page {
+  display: flex;
+  gap: var(--space-3);
+  height: calc(100vh - 250px);
+  padding: var(--space-2) var(--layout-content-padding) var(--space-4);
+}
+
+.df-fill-form-col {
+  flex: 1;
+  min-width: 420px;
+}
+
+.df-fill-preview-col {
+  width: 420px;
+  flex-shrink: 0;
+}
+
+/* 窄屏（笔记本 13 寸竖着放两栏会挤成一条线）：上下排，预览在下
+   并给一个固定高度——否则 flex 子项高度塌成 0，用户以为预览坏了 */
+@media (max-width: 1180px) {
+  .df-fill-page {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .df-fill-form-col {
+    min-width: 0;
+  }
+
+  .df-fill-preview-col {
+    width: auto;
+    height: 560px;
+  }
+}
+
+/* 底部操作条：长表单滚到底不用再滚回去找按钮。
+   固定在列底（列本身是 flex column，body 负责滚），所以任何时候都看得见。 */
+.df-fill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--app-border-light);
+  background: var(--app-bg-panel);
+}
+
+/* 「必填 12 项 · 已填 5」：跟着填写实时变，所以字号压小、不加粗，
+   免得每敲一个字都有东西在跳 */
+.df-fill-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-body-1);
+  font-weight: var(--font-weight-normal);
+  color: var(--app-text-caption);
+}
+
+.df-fill-count.is-ready {
+  color: rgb(var(--success-6));
+}
+
+/* 数据 JSON 预览用的等宽块 */
+.df-fill-json {
+  margin: 0;
+  padding: var(--space-3);
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--color-fill-1);
+  border: 1px solid var(--app-border-light);
+  border-radius: var(--app-radius-control);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-body-1);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--app-text-body);
+}
