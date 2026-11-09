@@ -1,0 +1,107 @@
+/**
+ * 签章资源（签名 / 印章）列表与详情 —— 组件样式
+ * 由 SealAssetList / SealAssetDetail 引用；颜色与间距全部取自 tokens.css
+ */
+
+/* ===== 列表 =====
+   工具栏与网格容器统一走 styles/page.css 的 .page-toolbar / .card-grid，
+   此处只保留签章卡片自身的内部结构样式。 */
+
+.seal-asset-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--app-bg-panel);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel);
+  padding: var(--space-4);
+}
+
+.seal-asset-thumb {
+  height: 100px;
+  border-radius: var(--app-radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seal-asset-thumb img {
+  max-height: 84px;
+  /* 必须同时限宽：手写签名图往往很扁很长（宽高比 6:1），只限高的话
+     宽度会按原始比例撑到卡片外面去，看起来像"签名被切掉一块"。 */
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.seal-asset-row {
+  margin-top: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.seal-asset-name {
+  font-size: var(--font-size-body-3);
+  font-weight: var(--font-weight-bold);
+  color: var(--app-text-title);
+}
+
+.seal-asset-meta {
+  margin-top: var(--space-1);
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-1);
+}
+
+.seal-asset-usable {
+  margin-top: var(--space-1);
+}
+
+.seal-asset-actions {
+  /* margin-top:auto 把操作条压到卡片底部，保证同排卡片按钮对齐 */
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-1);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.seal-asset-danger {
+  color: rgb(var(--danger-6));
+}
+
+/* ===== 详情 ===== */
+.seal-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.seal-detail-preview {
+  height: 260px;
+  border-radius: var(--app-radius-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seal-detail-preview img {
+  object-fit: contain;
+}
+
+.seal-detail-section {
+  margin-top: var(--space-4);
+}
+
+.seal-detail-meta {
+  margin-top: var(--space-1);
+  color: var(--app-text-caption);
+  font-size: var(--font-size-body-1);
+}
+
+.seal-detail-note {
+  margin-top: var(--space-1);
+}
+
+.seal-detail-muted {
+  color: var(--app-text-caption);
+}

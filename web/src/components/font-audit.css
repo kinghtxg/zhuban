@@ -1,0 +1,134 @@
+/* 模板用字体检提示。
+   放在上传向导里（选完文件立刻出现）和模板详情页顶部。
+
+   为什么值得一个独立组件：这段提示的**措辞**比样式重要得多。
+   缺字体是一个不报错的故障——导出 200、正文全对、PDF 能打开，
+   只是字形被悄悄换掉。用户在自己的 Windows 上打开模板是好的，
+   所以他没有任何线索怀疑。所以这里要说的不是「你少了东西」，
+   而是「导出会变成这样，你有两条路可选」。 */
+
+.fa-panel {
+  box-sizing: border-box;
+  border-radius: var(--app-radius-panel, 10px);
+  border: 1px solid var(--color-border-2);
+  background: #fff;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 有缺失：左侧一道警示色。不用整块红底——缺字体不是错误，
+   是"导出结果会和你预期不一样"，红底会让人以为模板坏了。 */
+.fa-panel.is-warn {
+  border-color: var(--color-warning-3, #ffe4ba);
+  background: color-mix(in srgb, var(--color-warning-1, #fff7e8) 55%, #fff);
+}
+
+/* 有 severe（汉字都可能显示不出）：这一档才用红。
+   两者的区别是"字形不对"与"字可能根本看不见"，不该给同一个颜色。 */
+.fa-panel.is-danger {
+  border-color: var(--color-danger-3, #fbaca3);
+  background: color-mix(in srgb, var(--color-danger-1, #ffece8) 55%, #fff);
+}
+
+.fa-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--color-text-1);
+}
+
+.fa-head .fa-count {
+  margin-left: auto;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.fa-ok {
+  color: var(--color-text-2);
+}
+
+.fa-ok svg {
+  color: rgb(var(--success-6, 0, 180, 42));
+}
+
+/* 逐字体一行：族名 / 会用什么代替 / 出现在哪 */
+.fa-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fa-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px dashed var(--color-border-2);
+}
+
+.fa-row:first-child {
+  border-top: none;
+}
+
+.fa-name {
+  flex: 0 0 auto;
+  max-width: 42%;
+  font-weight: 600;
+  color: var(--color-text-1);
+  word-break: break-all;
+}
+
+.fa-arrow {
+  flex: 0 0 auto;
+  color: var(--color-text-4);
+}
+
+.fa-resolved {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text-2);
+  word-break: break-all;
+}
+
+/* 「正文 · 样式」这种位置说明：次要信息，不能挤掉族名 */
+.fa-parts {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+.fa-foot {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border-2);
+  font-size: 12px;
+  color: var(--color-text-2);
+}
+
+.fa-foot ol {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.fa-foot li {
+  margin-top: 2px;
+}
+
+.fa-foot .fa-act {
+  margin-top: 8px;
+}
+
+/* 页面顶部的横幅形态：比面板更宽，用于模板详情页 */
+.fa-banner {
+  margin-bottom: 16px;
+}
+
+/* 只报"没能检查"时用：一行灰字，不占地方也足够诚实 */
+.fa-quiet {
+  font-size: 12px;
+  color: var(--color-text-3);
+}

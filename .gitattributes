@@ -1,0 +1,26 @@
+# 行尾规范。
+#
+# 只声明「必须按字节处理」的几类，不用 `* text=auto` 全库归一化——
+# 那会把所有文本文件重写一遍，diff 里全是行尾噪音，掩盖真正的改动。
+#
+# 为什么必须有这一份：本机 core.autocrlf=true，检出即 CRLF。
+# shell 脚本带上 CRLF 后在 Linux 上直接 "bad interpreter"，
+# 而这类失败发生在部署那一刻，跟"脚本内容对不对"完全无关，极难联想。
+
+# 脚本一律 LF
+*.sh    text eol=lf
+*.bash  text eol=lf
+*.py    text eol=lf
+
+# 二进制：绝不能做行尾转换（docx/xlsx 是 zip，转了就损坏且体积翻倍）
+*.docx  binary
+*.xlsx  binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.pdf   binary
