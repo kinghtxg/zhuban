@@ -21,6 +21,9 @@ from .security import SecurityError, validate_docx
 TOKEN_RE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.DOTALL)
 IDENT = r"[A-Za-z_][A-Za-z0-9_]*"
 CN = r"0-9A-Za-z_一-鿿"
+# 变量名（含中文）。Python 3 的标识符规则本来就允许中文，Jinja2 也认；
+# 只用 IDENT 会把中文名整条漏掉。凡「这里可能出现用户起的变量名」的地方都用 VAR。
+VAR = rf"[A-Za-z_一-鿿][{CN}]*"
 
 JINJA_KEYWORDS = {"not", "and", "or", "in", "is", "True", "False", "None",
                   "if", "else", "endif", "for", "endfor", "loop", "as", "by"}
@@ -44,7 +47,7 @@ _STRING_LIT_RE = re.compile(r"'[^']*'|\"[^\"]*\"")
 # Jinja 里 obj["中文键"] 和 obj.中文键 完全等价，而中文键做不了合法标识符，
 # 很多模板作者（尤其是从别的系统迁过来的）天生更习惯写方括号。
 # 只认**字面量**键：`it[循环变量]` 这种动态下标取不到确定的字段名，跳过。
-_SUBSCRIPT_RE = re.compile(rf"({IDENT})\s*\[\s*(['\"])(.*?)\2\s*\]")
+_SUBSCRIPT_RE = re.compile(rf"({VAR})\s*\[\s*(['\"])(.*?)\2\s*\]")
 
 # 点引用链：`it.备注`、`a.b.c`、`数据.备注`。
 # 用一个正则吃下整条链再拆，避免 `a.b` 被拆成两个裸名字。
@@ -110,6 +113,7 @@ def _extract_tokens(repaired_bytes: bytes) -> Tuple[List[Tuple[str, str]], List[
     ]
     # document.xml 放最前，保证变量在清单里的顺序以正文为主（页眉变量排后面）
     parts.sort(key=lambda n: (n != "word/document.xml", n))
+    _seen_img_warn = set()   # 同一张图在多个部件/段落重复出现只报一次
 
     for part in parts:
         try:
@@ -122,15 +126,69 @@ def _extract_tokens(repaired_bytes: bytes) -> Tuple[List[Tuple[str, str]], List[
             continue
         for p in root.iter(qn("p")):
             text = "".join(t.text or "" for t in p.iter(qn("t")))
+            para_vars: List[str] = []
             for m in TOKEN_RE.finditer(text):
                 tok = m.group(0)
                 if tok.startswith("{{"):
-                    tokens.append(("var", tok[2:-2].strip()))
+                    nm = tok[2:-2].strip()
+                    tokens.append(("var", nm))
+                    para_vars.append(nm)
                 elif tok.startswith("{%"):
                     tokens.append(("block", tok[2:-2].strip()))
                 elif tok.startswith("{#"):
                     tokens.append(("comment", tok[2:-2].strip()))
+            # 图片 + 固定行距 = 图片被裁成一行高。
+            #
+            # 公文正文按 GB/T 9704 用「固定值 28.8 磅」行距，而固定行距会
+            # **按行高把超出的内容裁掉**：一张 30mm 高的印章图放进 28.8 磅的段落，
+            # 纸面上只剩顶部一条弧。这不是渲染错，是行距规则，所以生成成功、
+            # 接口 200、字数字句全对，只有肉眼看才发现「图片没了」。
+            # 实测：本轮 10 式里 ① 的印章、⑦ 的插图各只剩一条。
+            # 扫描期就把这个事实说出来，比生成完再让用户去数图片强。
+            for nm in para_vars:
+                if _kind_by_name(nm, "scalar") != "image":
+                    continue
+                pt = _exact_line_pt(p)
+                if pt is None:
+                    continue
+                key = (nm, pt)
+                if key in _seen_img_warn:
+                    continue
+                _seen_img_warn.add(key)
+                diags.append({
+                    "severity": "warning",
+                    "message": "图片变量「%s」所在段落用了固定行距 %g 磅：固定行距会把超出"
+                               "行高的内容裁掉，图片只会显示 %g 磅高的一条。请把该段行距改成"
+                               "「单倍」或「最小值」，或把图片单独放在行距不受限的段落里。"
+                               % (nm, pt, pt),
+                    "location": part,
+                })
     return tokens, diags
+
+
+def _exact_line_pt(p) -> "float | None":
+    """段落若用固定行距，返回行高（磅）；否则 None。
+
+    只认**段落自己**的 `w:spacing@w:lineRule="exact"`。从样式继承来的固定行距
+    （styles.xml 里的 docDefaults）暂且不管：那属于全局设定，改起来是另一回事，
+    而这里要拦的是「用户给图片段落单独设了固定行距」这个高频坑。
+    """
+    pPr = p.find(qn("pPr"))
+    if pPr is None:
+        return None
+    sp = pPr.find(qn("spacing"))
+    if sp is None:
+        return None
+    if (sp.get(qn("lineRule")) or "") != "exact":
+        return None
+    try:
+        v = int(sp.get(qn("line")) or 0)
+    except (TypeError, ValueError):
+        return None
+    # >60 磅的固定行距基本容得下常见小图，不再打扰
+    if v <= 0 or v > 1200:
+        return None
+    return v / 20.0
 
 
 def _kind_by_name(name: str, default: str) -> str:
@@ -263,11 +321,16 @@ def _refs(expr: str, stack: List[Tuple[str, str]]):
         if len(parts) < 2:
             continue
         base, field = parts[0], parts[1]
-        if _ASCII_IDENT_RE.match(base):
+        if _ASCII_IDENT_RE.match(base) or base in stack_vars:
+            # stack_vars 这一支是为中文循环变量加的：`{% for 条 in 条款 %}` 里的
+            # `条` 不是 ASCII 标识符，若只按 ASCII 判断，`条.编号` 会掉进下面的
+            # else 分支，被登记成一个名叫「条」的标量字段——正好是「循环消失、
+            # 多出一个莫名其妙的输入框」那个症状。
             loop_fields.append((base, field))
         else:
-            # 中文基名的点引用（`数据.备注`）历史上按「基名登记为标量」处理，
-            # 这里保持原样，免得既有模板的变量凭空消失或改名。
+            # 中文基名的点引用（`数据.备注`，且 数据 不在任何循环栈里）历史上
+            # 按「基名登记为标量」处理，这里保持原样，免得既有模板的变量
+            # 凭空消失或改名。
             names.append(base)
     work = _CHAIN_RE.sub(" ", work)
 
@@ -327,7 +390,20 @@ def _build_variables(tokens: List[Tuple[str, str]]):
             "location": f"行{e.lineno}",
         })
 
-    loop_re = re.compile(rf"^for\s+({IDENT})\s+in\s+(.+)$")
+    # 循环变量名允许中文。
+    #
+    # 原先用 IDENT（纯 ASCII）匹配，理由是「Jinja 的循环变量必须是合法 Python
+    # 标识符」。但 Python 3 的标识符规则本来就允许中文，实测 Jinja2 3.1.6 对
+    # `{% for 条 in 条款 %}{{ 条.编号 }}{% endfor %}` 编译与渲染都正常。
+    #
+    # 只认 ASCII 的后果是**整个循环凭空消失**：loops 里没有它、迭代对象也不登记，
+    # 循环变量反过来被当成一个标量字段（界面让用户填「条」这个字符串），
+    # 而 {{ 条.编号 }} 在渲染时因 undefined 输出空串。中文模板作者几乎必然
+    # 写成中文循环变量，这类模板会整体失效，而扫描全绿、零诊断。
+    #
+    # 首字符不能是数字（Python 标识符规则），其余按 CN 字符集放宽。
+    LOOP_VAR = r"[A-Za-z_一-鿿][0-9A-Za-z_一-鿿]*"
+    loop_re = re.compile(rf"^for\s+({LOOP_VAR})\s+in\s+(.+)$")
     # 比较式里的**左侧字段名允许中文**。
     #
     # IDENT 只认 ASCII，那是给 for 循环变量用的（Jinja 的循环变量必须是
@@ -498,7 +574,18 @@ def scan_docx(raw: bytes, repair: bool = True) -> dict:
         loopvar_to_iterable.setdefault(info["loop_var"], it)  # 同名变量取首次出现，结果才稳定
     nested_of: "OrderedDict[str, Tuple[str, str]]" = OrderedDict()  # 子 iterable -> (父 iterable, 字段名)
     for it in loops:
-        m = re.match(rf"^({IDENT})\.([{CN}]+)$", it)
+        # 基名必须按 VAR（含中文）匹配。
+        #
+        # 这里原先写 `({IDENT})`，只认 ASCII 循环变量。中文模板里的嵌套循环
+        # 几乎必然写成 `{% for 章 in 章节 %}{% for 条 in 章.条款 %}`——`章.条款`
+        # 匹配不上，就不会被认成子循环，于是整个子循环被当成**顶层变量**
+        # 挂到最外层，名字就叫「章.条款」。后果是致命的：
+        #   · schema.required 里多出一个顶层 key「章.条款」，而正确数据是
+        #     章节[i].条款 → 校验直接报「字段缺失」，**嵌套循环模板一次都投不进去**；
+        #   · 变量面板出现一个用户看不懂的「章.条款」输入项，真正要填的
+        #     章节项里反而没有条款。
+        # 中文循环变量与中文字段名是公文/报告模板的默认写法，这条路必须通。
+        m = re.match(rf"^({VAR})\.([{CN}]+)$", it)
         if not m:
             continue
         parent_it = loopvar_to_iterable.get(m.group(1))
