@@ -5,6 +5,7 @@ import json
 import time
 import traceback
 import uuid
+import base64
 from contextlib import asynccontextmanager
 from typing import Dict
 
@@ -168,11 +169,19 @@ async def apply_endpoint(file: UploadFile = File(...), model: str = Form(...)):
         raise SecurityError("data_invalid", f"model 不是合法 JSON：{e}", status=422)
     if not isinstance(model_obj, dict) or "blocks" not in model_obj:
         raise SecurityError("data_invalid", "model 必须是含 blocks 数组的对象", status=422)
-    out_bytes = apply_model(raw, model_obj)
+    warns: list = []
+    out_bytes = apply_model(raw, model_obj, warns)
+    headers = {"Content-Disposition": 'attachment; filename="applied.docx"'}
+    if warns:
+        # 回写时有"为了不破坏格式而没敢改"的地方：用响应头带出去（base64，
+        # 因为 HTTP 头只能是 latin-1，中文会炸）。Go 层目前不透传，但验收脚本
+        # 与排障要能看见——静默降级比报错更难查。
+        headers["X-Zhuban-Warnings"] = base64.b64encode(
+            json.dumps(warns, ensure_ascii=False).encode("utf-8")).decode("ascii")
     return Response(
         content=out_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": 'attachment; filename="applied.docx"'},
+        headers=headers,
     )
 
 

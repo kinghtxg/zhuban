@@ -21,8 +21,9 @@ function paraIndex(id: string): number | null {
 
 /**
  * 把前端块数组序列化为 apply 真正接受的形状。
- * 关键：docapply 不认识 list 块（会把聚合段落坍缩），这里把 list 块展开为
- * 逐段 paragraph 块（id = p{suffix+i}），保证列表样式与文字在回写时原样保留。
+ * 关键：list 块的每一项在 document.xml 里都是**独立的一段**，回写也按段进行。
+ * 这里把它展开成逐段 paragraph（id 用后端给的 items[].id，缺省时按 p{idx+i}
+ * 兜底），这样"只改其中一项"不会连带把同列表的其它项当成已删除段落删掉。
  * 其余块透传；new- 前缀块由 apply 插入。
  */
 export function serializeForApply(blocks: EditBlock[]): Record<string, unknown>[] {
@@ -30,9 +31,12 @@ export function serializeForApply(blocks: EditBlock[]): Record<string, unknown>[
   for (const b of blocks) {
     if (b.type === 'list') {
       const idx = paraIndex(b.id);
-      if (idx === null) continue;
       b.items.forEach((it, i) => {
-        out.push({ id: `p${idx + i}`, type: 'paragraph', text: it.text ?? '' });
+        // 优先用后端下发的真实 id：靠 p{idx+i} 猜，一旦后端改了列表聚合规则
+        // （比如把两张列表分开），猜出来的 id 会落到别的段落上。
+        const pid = (it as { id?: string }).id ?? (idx !== null ? `p${idx + i}` : null);
+        if (!pid) return;
+        out.push({ id: pid, type: 'paragraph', text: it.text ?? '' });
       });
       continue;
     }

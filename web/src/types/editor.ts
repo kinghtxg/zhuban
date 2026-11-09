@@ -105,7 +105,9 @@ export type EditBlock =
       id: string;
       type: 'list';
       ordered: boolean;
-      items: { text: string; tokens?: EditToken[]; fmt?: EditFmt; runs?: EditRun[] }[];
+      /** item.id 是该项段落在 document.xml 里的真实块 id（后端 parse 下发），
+       *  回写时用它定位，别靠 p{起始序号+i} 猜。 */
+      items: { id?: string; text: string; tokens?: EditToken[]; fmt?: EditFmt; runs?: EditRun[] }[];
     }
   | {
       id: string;

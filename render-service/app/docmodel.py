@@ -537,6 +537,17 @@ def _unsupported_info(p) -> Optional[Dict[str, str]]:
     if p.findall(".//{%s}anchor" % WP):
         return {"note": "浮动锚定对象（wp:anchor）：随文档原样保留，不参与在线排版",
                 "text": ""}
+    # Word 域（目录 / 页码 / 交叉引用 / SEQ 编号）。
+    #
+    # 域里的文字是 Word 算出来的：在线改它，下次更新域就回滚；而把域结构清掉会
+    # **立刻**生效——目录变白、页码变「第 页 共 页」、引用编号串位。两种结果都
+    # 是「用户改了却看不出对错」的静默失败，所以整段按只读处理，让人别白改一场。
+    # 要改目录就回 Word 更新域，这在产品上比"假装能改"诚实。
+    if (p.findall(".//" + qn("fldSimple")) or p.findall(".//" + qn("fldChar"))
+            or p.findall(".//" + qn("instrText"))):
+        return {"note": "含 Word 域（目录/页码/交叉引用）：内容由 Word 生成，在线不参与编辑，"
+                        "原样保留；需要更新请回 Word 按 F9",
+                "text": paragraph_text(p)}
     return None
 
 
@@ -1014,7 +1025,9 @@ def parse_docx(raw: bytes) -> Dict[str, Any]:
             if _has_numpr(child):
                 pid = f"p{p_counter}"
                 p_counter += 1
-                item: Dict[str, Any] = {"text": text, "tokens": extract_tokens(text)}
+                # item 必须带自己的 id：apply 侧按 id 判断"模型里还在不在"，
+                # 缺 id 的列表项会被当成已删除段落整段删掉（编号一起没）。
+                item: Dict[str, Any] = {"id": pid, "text": text, "tokens": extract_tokens(text)}
                 if fmt:
                     item["fmt"] = fmt
                 if runs:
