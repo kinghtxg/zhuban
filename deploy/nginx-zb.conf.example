@@ -1,0 +1,70 @@
+# 铸版反代示例（nginx）
+#
+# 安全响应头（HSTS / nosniff / X-Frame-Options / CSP / Referrer-Policy /
+# Permissions-Policy）由**应用自己**下发，见 server/internal/api/security.go。
+# 这份配置不再重复 add_header：同一个头出现两份时，X-Frame-Options 这类
+# 非列表头的处理方式各浏览器并不一致，CSP 则会按「两条策略同时满足」执行，
+# 排查起来全是坑。应用层下发才是默认成立的（本地直连、内网直连都有效）。
+#
+# 反代这边只负责两件应用做不到的事：
+#   1. TLS 终止与 HTTP→HTTPS 跳转
+#   2. 把真实客户端地址传给应用 —— 并且必须只有可信代理能连进来，
+#      否则应用侧的来源 IP 判定就形同摆设。
+#
+# 用法：
+#   1. 替换 zb.example.com 与证书路径
+#   2. certbot --nginx -d zb.example.com
+#   3. nginx -t && systemctl reload nginx
+
+# ---- HTTP → HTTPS ----
+server {
+    listen 80;
+    listen [::]:80;
+    server_name zb.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name zb.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/zb.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/zb.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+
+    # ---- 安全响应头 ----
+    # 由应用下发，这里不要重复设置。若你确实需要在这一层补（比如前面还挂了
+    # 别的老服务），务必先去掉应用侧同名头，否则会变成两条策略叠加。
+    # HSTS 也由应用在「确认是 https」时下发（它看 X-Forwarded-Proto，
+    # 且只在请求来自可信代理时采信），无需在这里写死一年。
+
+    # ---- 上传体积 ----
+    # 要 ≥ MAX_TEMPLATE_MB / MAX_IMAGE_MB 与 MAX_JSON_MB，否则大模板在代理层就被挡，
+    # 应用日志里什么都看不到，只有 413。
+    client_max_body_size 64m;
+    client_body_timeout  120s;
+
+    # ---- 反代 ----
+    location / {
+        proxy_pass         http://127.0.0.1:18100;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        # 应用只在「直连对端是本机/私网」时才采信 X-Forwarded-For，并从右往左
+        # 找第一个非代理地址。所以：
+        #   - 这里必须用 $proxy_add_x_forwarded_for（追加，不覆盖），否则真实
+        #     客户端地址会被丢掉；
+        #   - 应用侧的 TRUSTED_PROXIES 默认已包含 127.0.0.0/8，本机反代零配置可用；
+        #   - 但 18100 端口仍然只能对这层代理开放（firewall / 只绑 127.0.0.1），
+        #     否则攻击者绕过 nginx 直连，虽然伪造不了来源 IP，却能绕过 TLS 与
+        #     client_max_body_size 这些放在代理层的约束。
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;   # 大模板渲染是长请求
+        proxy_send_timeout 300s;
+        proxy_buffering    off;    # 下载大产物时不要先缓冲到磁盘
+    }
+}
