@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    /* E2E 用例里大量 page.evaluate(() => document.querySelector(...))，
+       所以这里必须带 DOM —— 而应用构建（tsconfig.app/node）不带，
+       两者职责不同，不能为了测试文件给构建配置放宽 lib。 */
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "types": ["node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["tests", "playwright.config.ts"]
+}

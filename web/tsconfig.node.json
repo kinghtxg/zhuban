@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "types": ["node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  /* 只放 Vite 构建配置本身。
+     E2E 用例与 playwright.config.ts 已拆到 tsconfig.test.json —— 它们需要 DOM lib
+     （page.evaluate 里直接用 document），而应用构建不该带 DOM；更重要的是，
+     生产镜像的构建链路不该被测试文件的类型拴住。 */
+  "include": ["vite.config.ts"]
+}
