@@ -1,0 +1,134 @@
+/* 富文本字段编辑器。
+   
+   视觉上要回答一个问题：「我现在打的字，最后会长的什么样？」
+   所以编辑区本身就用正文的字体与行高（16px/1.75），而不是控件的小字号——
+   用户在 12px 的框里打完 500 字，生成出来是 16pt 的正文，他判断不了篇幅。
+   
+   工具栏做成低矮的一条，只在聚焦时着色：这是表单里的一个字段，
+   不是页面级编辑器，抢注意力就错了。 */
+
+.df-rich {
+  border: 1px solid var(--app-border);
+  border-radius: var(--border-radius-medium);
+  background: var(--color-bg-2);
+  transition: border-color var(--transition-fast);
+  overflow: hidden;
+}
+
+.df-rich:hover {
+  border-color: var(--app-border-strong);
+}
+
+/* 聚焦时不整圈发光，只换边框色：表单里同时只有一个字段聚焦，
+   但整圈发光会让长表单在滚动时一直有光斑 */
+.df-rich:focus-within {
+  border-color: rgb(var(--primary-6));
+}
+
+.df-rich.is-error {
+  border-color: rgb(var(--danger-6));
+}
+
+.df-rich-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--color-fill-1);
+  transition: background var(--transition-fast);
+}
+
+.df-rich-bar.is-focus {
+  background: var(--color-fill-2);
+}
+
+.df-rich-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--border-radius-small);
+  background: transparent;
+  color: var(--app-text-caption);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.df-rich-btn:hover {
+  background: var(--color-fill-3);
+  color: var(--app-text-body);
+}
+
+.df-rich-btn:active {
+  background: var(--color-fill-4);
+}
+
+.df-rich-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: var(--app-border);
+}
+
+.df-rich-hint {
+  margin-left: auto;
+  padding-right: 2px;
+  font-size: 12px;
+  color: var(--app-text-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 编辑区与占位文字要叠在同一位置：占位是绝对定位的一层，
+   否则它会把光标位置顶下去一行 */
+.df-rich-wrap {
+  position: relative;
+}
+
+.df-rich-ph {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  pointer-events: none;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text-4);
+}
+
+.df-rich-box {
+  padding: 10px 12px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--app-text-body);
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+/* 编辑区里的图片：限制最大宽度，否则贴一张手机截图会把左栏撑出横向滚动条，
+   用户连"生成"按钮都点不到 */
+.df-rich-box img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-small);
+  margin: 4px 0;
+}
+
+.df-rich-box b,
+.df-rich-box strong {
+  font-weight: 600;
+}
+
+.df-rich-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 6px 4px;
+}
