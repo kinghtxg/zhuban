@@ -41,6 +41,45 @@ TOP_FILES = ["启动铸版.bat", "清除字体注册.bat", "说明.txt"]
 # app/ 下由仓库维护的文件
 APP_FILES = ["launcher.py", "unregister_fonts.py"]
 
+# 模板样例/ 目录里那份说明。刻意不写来源单位：这份模板是客户内部资料的
+# 改造件，便携版会流到别人机器上，没必要把出处一起带走。
+SAMPLES_README = """模板样例
+========
+
+本目录是随包附带的现成模板，直接导入就能用，不需要先自己做模板。
+
+一、导入方法
+------------
+1. 双击「启动铸版.bat」，等浏览器自动打开（首次要 30 秒左右注册字体）。
+2. 登录后进「模板中心 → 模板库」，点右上角「上传模板」。
+3. 选本目录下的 渗透测试报告-模板.docx，等待扫描完成。
+
+二、配套示例数据
+----------------
+data-full.json         不含截图的示例数据（11 页成品）
+data-with-shots.json   前两条漏洞各带 1 张截图的示例数据
+
+导入模板后点「试运行」，把上面任意一个 json 的内容整段粘进数据框即可出图。
+两个文件的差别就是「填不填截图」，可以拿来对照版式有没有变。
+
+三、这个模板里有什么
+--------------------
+13 个标量变量、1 个表格行循环（漏洞列表）、3 个段落子循环
+（描述 / 详情 / 建议）、1 个截图子循环。
+
+四、两个容易踩的坑
+------------------
+1. 漏洞列表里的「截图」是必填键，没有截图也要给空数组 []，
+   否则接口会报「字段缺失」。
+2. 截图的字段名必须带 image_ 前缀（形如
+   {"image_截图": {"type":"image","src":"data:image/png;base64,..."}}），
+   去掉前缀会被当成普通文本框，图就不显示了。
+
+截图默认按自身 DPI 折算，等比钳在 146×60 mm 以内；
+要更长的长截图，改渲染服务的 MAX_INLINE_IMAGE_HEIGHT_MM。
+"""
+
+
 CHUNK = 1 << 20
 
 
@@ -75,7 +114,7 @@ def unpack(base_zip: str, dst: str) -> None:
 
 
 # --------------------------------------------------------------------------- 覆盖
-def overlay(root: str, exe: str, version: str, commit: str) -> None:
+def overlay(root: str, exe: str, version: str, commit: str, samples: str | None = None) -> None:
     app = os.path.join(root, "app")
 
     # 1) 主程序
@@ -121,6 +160,31 @@ def overlay(root: str, exe: str, version: str, commit: str) -> None:
         open(os.path.join(root, f), "wb").write(data)
     say("  顶层 %s" % "、".join(TOP_FILES))
 
+    # 4) 模板样例（可选，从仓库外的归档目录取，不进仓库）
+    #
+    # 为什么不在仓库里：这份渗透测试报告模板是客户内部资料的改造件，
+    # 一旦放进仓库就会随公开快照、GitHub Release、GHCR 镜像一起分发。
+    # 但它对「拿到便携版的自己人」是有用的现成素材，所以走 --samples
+    # 在打包时注入：公开侧干净，打包版带着。
+    #
+    # 只带 docx 与 json：归档目录里的 填写示例.pdf/png 是成品渲染图，
+    # 会把这台机器上渲染出来的页眉页脚一起带出去，没必要。
+    if samples:
+        dst = os.path.join(root, "模板样例")
+        os.makedirs(dst, exist_ok=True)
+        took = []
+        for f in sorted(os.listdir(samples)):
+            if not f.lower().endswith((".docx", ".json")):
+                continue
+            shutil.copyfile(os.path.join(samples, f), os.path.join(dst, f))
+            took.append(f)
+        note = os.path.join(dst, "说明.txt")
+        with open(note, "wb") as fh:
+            fh.write(SAMPLES_README.encode("utf-8"))
+        say("  模板样例/  %d 个文件 + 说明.txt" % len(took))
+        if not took:
+            say("    · 警告：--samples 指向的目录里没有 docx/json")
+
 
 def _stamp_readme(data: bytes, version: str, commit: str) -> bytes:
     """把说明.txt 里的版本号与提交号改成实际值。"""
@@ -128,6 +192,10 @@ def _stamp_readme(data: bytes, version: str, commit: str) -> bytes:
     text = re.sub(r"(便携版\s+)\d+\.\d+\.\d+", r"\g<1>" + version, text, count=1)
     text = re.sub(r"(?m)^(\s*版本\s+)\d+\.\d+\.\d+", r"\g<1>" + version, text)
     text = re.sub(r"(?m)^(\s*提交\s+)[0-9a-f]{7,40}", r"\g<1>" + commit, text)
+    # 章节标题里也带版本号（【这一版能做什么（3.4.24）】）。漏了它，
+    # 包里就会出现「标题写 3.4.24、末尾技术参数写 3.4.25」这种自相矛盾。
+    text = re.sub(r"(能做什么（)\d+\.\d+\.\d+(）)",
+                  lambda m: m.group(1) + version + m.group(2), text)
     return b"\xef\xbb\xbf" + text.encode("utf-8")
 
 
@@ -155,7 +223,7 @@ def pack(root: str, out_zip: str, version: str) -> None:
 
 
 # --------------------------------------------------------------------------- 校验
-def verify(zip_path: str, version: str, commit: str, exe: str) -> None:
+def verify(zip_path: str, version: str, commit: str, exe: str, samples: str | None = None) -> None:
     """不接受「看起来打成了」：逐条查证据。"""
     say("")
     say("[校验] %s" % os.path.basename(zip_path))
@@ -224,6 +292,22 @@ def verify(zip_path: str, version: str, commit: str, exe: str) -> None:
         if commit not in readme:
             problems.append("说明.txt 里没有提交号 %s" % commit)
 
+        # 8) 模板样例：给了就逐字节比，别出现「样式在但文件是旧的」
+        if samples:
+            want = sorted(f for f in os.listdir(samples)
+                          if f.lower().endswith((".docx", ".json")))
+            if not want:
+                problems.append("--samples 目录里没有任何 docx/json")
+            for f in want:
+                p = top + "/模板样例/" + f
+                if p not in names:
+                    problems.append("包里缺 模板样例/%s" % f)
+                    continue
+                if z.read(p) != open(os.path.join(samples, f), "rb").read():
+                    problems.append("模板样例/%s 与源文件不一致" % f)
+            if top + "/模板样例/说明.txt" not in names:
+                problems.append("包里缺 模板样例/说明.txt")
+
     if problems:
         say("")
         for p in problems:
@@ -240,6 +324,10 @@ def verify(zip_path: str, version: str, commit: str, exe: str) -> None:
     say("  √ zhuban.exe          与传入 exe 同 sha256，内含 %s / %s" % (version, commit))
     say("  √ render/app/*.py     与仓库逐字节一致")
     say("  √ 说明.txt            版本与提交号正确")
+    if samples:
+        n = len([f for f in os.listdir(samples)
+                 if f.lower().endswith((".docx", ".json"))])
+        say("  √ 模板样例            %d 个文件与源逐字节一致 + 说明.txt" % n)
 
 
 # --------------------------------------------------------------------------- 主流程
@@ -250,6 +338,7 @@ def main() -> int:
     ap.add_argument("--version", required=True)
     ap.add_argument("--commit", required=True)
     ap.add_argument("--out", required=True, help="输出 zip 路径")
+    ap.add_argument("--samples", default="", help="模板样例目录（仓库外，随包注入 模板样例/）")
     ap.add_argument("--keep", action="store_true", help="保留解压出来的工作目录")
     a = ap.parse_args()
 
@@ -257,6 +346,9 @@ def main() -> int:
         if not os.path.isfile(p):
             say("[×] %s 不存在：%s" % (what, p))
             return 1
+    if a.samples and not os.path.isdir(a.samples):
+        say("[×] 模板样例目录不存在：%s" % a.samples)
+        return 1
 
     work = tempfile.mkdtemp(prefix="zbportable-")
     root = os.path.join(work, "pkg")
@@ -265,11 +357,11 @@ def main() -> int:
     try:
         unpack(a.base, root)
         say("[2/4] 覆盖主程序与源码")
-        overlay(root, a.exe, a.version, a.commit)
+        overlay(root, a.exe, a.version, a.commit, a.samples or None)
         say("[3/4] 打包")
         pack(root, a.out, a.version)
         say("[4/4] 校验")
-        verify(a.out, a.version, a.commit, a.exe)
+        verify(a.out, a.version, a.commit, a.exe, a.samples or None)
     finally:
         if a.keep:
             say("  工作目录保留：%s" % root)

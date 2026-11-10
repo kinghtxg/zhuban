@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, Message, Modal, Popconfirm, Radio, Space, Spin, Tag } from '@arco-design/web-react';
@@ -18,12 +18,15 @@ import {
   validateData,
 } from '@/api/endpoints';
 import FillForm, { blankForm, isBlank, isSignatureVar } from '@/components/FillForm';
+import MarkdownFillEditor, { type MarkdownFillEditorHandle } from '@/components/mdfill/MarkdownFillEditor';
+import type { ExtractIssue } from '@/components/mdfill/extract';
 import FreeWritePanel from '@/components/FreeWritePanel';
 import ChartDataDrawer, { type ChartPayload } from '@/components/ChartDataDrawer';
 import SignAssetPicker from '@/components/SignAssetPicker';
 import PreviewPane from '@/components/PreviewPane';
 import EmptyState from '@/components/EmptyState';
 import { assetIdOf, replaceAsset } from '@/utils/signvalue';
+import { fileToDataUrl } from '@/utils/imagefile';
 import type { Format, TemplateVariable, ValidateIssue } from '@/types/api';
 import { errorMessage } from '@/utils/format';
 
@@ -59,6 +62,17 @@ export default function TemplateFill() {
   const [format, setFormat] = useState<Format>('docx');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [issues, setIssues] = useState<ValidateIssue[]>([]);
+
+  // 填写形态。默认走「文档」：模板字段名本身就是标题，按标题往下写，
+  // 比对着一个叫「漏洞列表[0].严重等级」的输入框猜自己在填文档哪一段直观得多。
+  // 表单保留为可切换——两者共用同一份 values，切过去看到的就是同一批内容。
+  const [mode, setMode] = useState<'doc' | 'form'>('doc');
+  const [docIssues, setDocIssues] = useState<ExtractIssue[]>([]);
+  const editorRef = useRef<MarkdownFillEditorHandle | null>(null);
+  const imgInputRef = useRef<HTMLInputElement | null>(null);
+  const imgTargetRef = useRef<string>('');
+  // 编辑器自己引发的 values 变化不该反过来重置编辑器（会把光标冲掉）。
+  const fromEditorRef = useRef(false);
   const [busy, setBusy] = useState<'validate' | 'render' | null>(null);
   const [jsonOpen, setJsonOpen] = useState(false);
   // 粘贴整篇自动对位：只产出建议，写进表单要用户勾选确认
@@ -146,6 +160,43 @@ export default function TemplateFill() {
     if (v.kind === 'qrcode') return '请填写二维码里的内容';
     if (v.kind === 'loop') return '至少填一项';
     return '这一项必填';
+  };
+
+  /**
+   * 文档模式：编辑器提取出的数据写回 values。
+   *
+   * 两个模式共用 values，所以从文档切到表单时看到的就是同一批内容；
+   * 反过来也一样。链路始终是「一种数据」，不是「两套状态」。
+   */
+  const onDocData = (data: Values, iss: ExtractIssue[]) => {
+    fromEditorRef.current = true;
+    setValues(data);
+    setDocIssues(iss);
+  };
+
+  /** 点字段旁的「添加图片」：记下目标字段，再触发文件选择。 */
+  const pickImage = (path: string) => {
+    imgTargetRef.current = path;
+    imgInputRef.current?.click();
+  };
+
+  const onImageChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = ''; // 同一张图连选两次也要触发 change
+    if (!f) return;
+    try {
+      const url = await fileToDataUrl(f);
+      editorRef.current?.insertImage(imgTargetRef.current, url);
+    } catch (err) {
+      Message.error(errorMessage(err).summary);
+    }
+  };
+
+  /** 文档模式下外部改了数据（示例/清空/粘贴对齐），要让编辑器整份重建。 */
+  const resetDoc = (next: Values) => {
+    fromEditorRef.current = false;
+    editorRef.current?.reset(next);
+    setDocIssues([]);
   };
 
   /**
@@ -276,14 +327,18 @@ export default function TemplateFill() {
     }
     // 用空表兜底再覆盖示例：示例里没有的变量（比如新加的字段）也得有个位置，
     // 否则那些字段会变成 undefined，填进去的循环项形状也会错。
-    setValues({ ...blankForm(vars), ...(s as Values) });
+    const next = { ...blankForm(vars), ...(s as Values) };
+    setValues(next);
+    resetDoc(next);
     setErrors({});
     setIssues([]);
     Message.success('已填入示例数据，把占位符改成真实内容即可');
   };
 
   const resetAll = () => {
-    setValues(blankForm(vars));
+    const next = blankForm(vars);
+    setValues(next);
+    resetDoc(next);
     setErrors({});
     setIssues([]);
     localStorage.removeItem(draftKey);
@@ -310,10 +365,20 @@ export default function TemplateFill() {
 
   return (
     <div className="df-fill-page">
-      {/* 左：问卷 */}
+      {/* 左：填写区 */}
       <div className="df-studio-col df-fill-form-col">
         <div className="df-studio-col-header">
           填写内容
+          <Radio.Group
+            type="button"
+            size="mini"
+            value={mode}
+            onChange={(v) => setMode(v as 'doc' | 'form')}
+            style={{ marginLeft: 12 }}
+          >
+            <Radio value="doc">文档</Radio>
+            <Radio value="form">表格式</Radio>
+          </Radio.Group>
           <span className={countCls}>
             {missingCount === 0 ? (
               <>
@@ -327,7 +392,7 @@ export default function TemplateFill() {
           </span>
         </div>
 
-        <div className="df-studio-col-body">
+        <div className={mode === 'doc' ? 'df-studio-col-body df-fill-doc-body' : 'df-studio-col-body'}>
           {issues.length > 0 && (
             <Alert
               type="warning"
@@ -351,19 +416,58 @@ export default function TemplateFill() {
               }
             />
           )}
-          <FillForm
-            variables={vars}
-            values={values}
-            onChange={setValues}
-            errors={errors}
-            onPickAsset={(v, value, apply) => setAssetPick({ v, value, apply })}
-            onEditChart={(v, value, apply) => setChartEdit({ v, value, apply })}
-            assetLabel={(_v, value) => {
-              const id = assetIdOf(value);
-              return id ? usableData?.[id]?.name || id : '';
-            }}
-          />
+          {mode === 'doc' ? (
+            <MarkdownFillEditor
+              key={mode}
+              variables={vars}
+              initialData={values}
+              onChange={onDocData}
+              onPickImage={pickImage}
+              onReady={(h) => {
+                editorRef.current = h;
+              }}
+            />
+          ) : (
+            <FillForm
+              variables={vars}
+              values={values}
+              onChange={(v) => {
+                setValues(v);
+                setDocIssues([]);
+              }}
+              errors={errors}
+              onPickAsset={(v, value, apply) => setAssetPick({ v, value, apply })}
+              onEditChart={(v, value, apply) => setChartEdit({ v, value, apply })}
+              assetLabel={(_v, value) => {
+                const id = assetIdOf(value);
+                return id ? usableData?.[id]?.name || id : '';
+              }}
+            />
+          )}
         </div>
+
+        {/* 文档模式的即时提示：提取时发现的必填空缺、枚举写错、多行被拼。
+            放在操作条上方而不是塞进正文，是因为这些是「系统对文档的解读结果」，
+            混在正文里会让人以为是自己写错了字。 */}
+        {mode === 'doc' && docIssues.length > 0 && (
+          <div className="df-mf-issues">
+            {docIssues.slice(0, 4).map((it, i) => (
+              <div key={i} className={it.level === 'error' ? 'is-error' : 'is-warn'}>
+                <b>{it.label}</b>：{it.message}
+              </div>
+            ))}
+            {docIssues.length > 4 && <div className="is-more">还有 {docIssues.length - 4} 条…</div>}
+          </div>
+        )}
+
+        {/* 选图用的隐藏输入框：文档模式下点字段旁的「添加图片」触发 */}
+        <input
+          ref={imgInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={onImageChosen}
+        />
 
         {/* 操作条固定在列底部：长表单滚到第 40 行时不用再滚回顶部找按钮 */}
         <div className="df-fill-actions">
@@ -373,9 +477,14 @@ export default function TemplateFill() {
                 清空重填
               </Button>
             </Popconfirm>
-            <Button size="small" type="text" icon={<IconThumbUp />} onClick={fillSample}>
-              填示例数据
-            </Button>
+            <Popconfirm
+              title="填入示例数据会覆盖当前已填内容，确定？"
+              onConfirm={fillSample}
+            >
+              <Button size="small" type="text" icon={<IconThumbUp />}>
+                填示例数据
+              </Button>
+            </Popconfirm>
             <Button size="small" type="text" icon={<IconPaste />} onClick={() => setFreeOpen(true)}>
               粘贴整篇
             </Button>
@@ -429,6 +538,7 @@ export default function TemplateFill() {
         onClose={() => setFreeOpen(false)}
         onApply={(next) => {
           setValues(next);
+          resetDoc(next);
           setErrors({});
           setIssues([]);
         }}

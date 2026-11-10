@@ -1,0 +1,361 @@
+/**
+ * Markdown 化填写页的样式。
+ *
+ * 只写结构性的东西：纸张、标题条、正文节奏。颜色一律取 Arco 变量，
+ * 不另造色板（参见 styles/tokens.css 开头那三条原则）。
+ *
+ * 「像 Word 文档」的观感来自三件事，缺一件就变成普通表单：
+ *   1. 纸张有明确边界（白底 + 边框 + 居中定宽），而不是铺满整屏；
+ *   2. 正文行距放宽（1.85），表单 1.57 的行高读长文会累；
+ *   3. 字段标题的字号/字重与正文拉开档位，让人一眼看出「这是模板定的」。
+ */
+
+.df-mf {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ---------------- 顶部工具条 ---------------- */
+
+.df-mf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel, 8px);
+  flex: none;
+}
+
+.df-mf-bar__title {
+  font-size: var(--font-size-body-1);
+  color: var(--color-text-3);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.df-mf-bar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.df-mf-bar__count {
+  font-size: var(--font-size-body-1);
+  color: var(--color-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- 纸张 ---------------- */
+
+.df-mf-paper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--app-radius-panel, 8px);
+}
+
+.df-mf-body {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-10) var(--space-12);
+  font-size: var(--font-size-body-3);
+  line-height: 1.85;
+  color: var(--color-text-1);
+  outline: none;
+}
+
+/* 正文段落：与标题之间留一点空气，但不要大到像两段无关内容 */
+.df-mf-body > p {
+  margin: 0 0 var(--space-3);
+  min-height: 26px;
+}
+
+.df-mf-body > p:last-child {
+  margin-bottom: 0;
+}
+
+/* 空段落也要有高度，否则用户点不进这个字段 */
+.df-mf-body > p:empty::after,
+.df-mf-body > p > br.ProseMirror-trailingBreak {
+  content: '';
+}
+
+.df-mf-body > p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-3);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* 图片：填表场景里用户放的是截图，别让它撑破纸张 */
+.df-mf-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-2);
+  margin: var(--space-2) 0;
+}
+
+.df-mf-body img.ProseMirror-selectednode {
+  outline: 2px solid rgb(var(--primary-6));
+  outline-offset: 2px;
+}
+
+/* 代码块：图表 JSON 写在这里 */
+.df-mf-body pre {
+  background: var(--color-fill-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  padding: var(--space-3);
+  margin: var(--space-2) 0 var(--space-4);
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.df-mf-body pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.df-mf-body :not(pre) > code {
+  background: var(--color-fill-2);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 0.92em;
+}
+
+/* 列表：部分模板的字段允许写要点 */
+.df-mf-body ul,
+.df-mf-body ol {
+  margin: var(--space-2) 0 var(--space-4);
+  padding-left: 1.6em;
+}
+
+.df-mf-body li {
+  margin: 2px 0;
+}
+
+/* ---------------- 骨架标题 ---------------- */
+
+.df-mf-h {
+  user-select: none;
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.df-mf-h:first-child {
+  margin-top: 0;
+}
+
+.df-mf-h__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.df-mf-h__label {
+  font-weight: 500;
+  color: var(--color-text-1);
+  line-height: var(--line-height-tight);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 层级：level 2 是顶层字段，level 3 落在循环条目内部 */
+.df-mf-h--l2 .df-mf-h__label {
+  font-size: var(--font-size-title-3);
+}
+
+.df-mf-h--l3 .df-mf-h__label {
+  font-size: var(--font-size-body-3);
+  color: var(--color-text-2);
+}
+
+.df-mf-h--l4 .df-mf-h__label {
+  font-size: var(--font-size-body-2);
+  color: var(--color-text-2);
+  font-weight: 400;
+}
+
+/* 循环条目标题：做成一条分隔带，视觉上把上一条和下一条切开 */
+.df-mf-h.is-item {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border-2);
+}
+
+.df-mf-h.is-item .df-mf-h__label {
+  font-size: var(--font-size-title-2);
+}
+
+.df-mf-h.is-item:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.df-mf-h__req {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(var(--danger-6));
+  display: inline-block;
+  flex: none;
+}
+
+.df-mf-h__hint {
+  font-size: var(--font-size-body-1);
+  color: var(--color-text-3);
+  font-weight: 400;
+}
+
+.df-mf-h__acts {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* 操作按钮平时藏起来：一屏十几个字段各挂两个按钮，看起来像后台表格。
+   悬停在标题上才出现，需要时找得到、不需要时不碍眼。 */
+.df-mf-h:hover .df-mf-h__acts,
+.df-mf-h:focus-within .df-mf-h__acts {
+  opacity: 1;
+}
+
+.df-mf-h__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 4px;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+  font-size: var(--font-size-body-1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.df-mf-h__btn:hover {
+  color: rgb(var(--primary-6));
+  border-color: rgb(var(--primary-5));
+}
+
+.df-mf-h__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.df-mf-h__btn--danger:hover {
+  color: rgb(var(--danger-6));
+  border-color: rgb(var(--danger-5));
+}
+
+/* 枚举可选值做成一排小胶囊：比写一句「可选：高/中/低」更容易扫读 */
+.df-mf-h__enum {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.df-mf-h__chip {
+  font-size: var(--font-size-body-1);
+  line-height: 18px;
+  padding: 0 var(--space-2);
+  border-radius: 3px;
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+  /* 是可点的：写错枚举值会让模板里的条件段整块消失，所以不给自由输入的机会 */
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.df-mf-h__chip:hover {
+  color: rgb(var(--primary-6));
+  border-color: rgb(var(--primary-5));
+  background: var(--color-bg-2);
+}
+
+.df-mf-h__chip:active {
+  transform: translateY(0.5px);
+}
+
+/* ---------------- 选中态 ---------------- */
+
+.df-mf-body .ProseMirror-gapcursor::after {
+  border-top-color: var(--color-text-1);
+}
+
+.df-mf-h.ProseMirror-selectednode {
+  outline: 1px dashed rgb(var(--primary-4));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 拖拽手柄（来自 starter-kit 的 drag handle 扩展） */
+.df-mf-body .ProseMirror-selectednode {
+  outline: none;
+}
+
+/* ---------------- 挂在填写页里的两处适配 ---------------- */
+
+/**
+ * 文档模式的内容区。
+ *
+ * 覆盖 .df-studio-col-body 的 padding 与 overflow（见 styles/global.css）：
+ * 填写页那一层是给表单用的，表单自己不会滚；编辑器要自己管滚动，
+ * 外面再套一层会出现「滚到底部卡住、再滚才动外层」的双滚动条。
+ */
+.df-fill-doc-body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 提取结果的提示条：贴在操作条上方，不塞进正文 */
+.df-mf-issues {
+  flex: none;
+  max-height: 108px;
+  overflow: auto;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border-2);
+  background: var(--color-fill-1);
+  font-size: var(--font-size-body-1);
+  line-height: 1.7;
+}
+
+.df-mf-issues .is-error {
+  color: rgb(var(--danger-6));
+}
+
+.df-mf-issues .is-warn {
+  color: rgb(var(--warning-6, 214 137 16));
+}
+
+.df-mf-issues .is-more {
+  color: var(--color-text-3);
+}

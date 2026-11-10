@@ -520,8 +520,14 @@ button.grid-card-title:focus-visible {
   text-align: center;
 }
 
-/* 整页级空状态：补一层白底容器，避免直接浮在页面底色上显得散 */
+/* 整页级空状态：补一层白底容器，避免直接浮在页面底色上显得散。
+   ⚠️ flex 三件套不能省：.df-page 是 min-height:100% 的 flex 列，页头与工具栏
+   都是 flex:none，剩下多少高度全靠这个块吃。只写 padding 时它按内容高度收尾，
+   下方留一大片页面底色 —— 空库时看着就像「白底没占满」。
+   min-height:0 是配套项：flex 子项默认 min-height:auto，内容再矮也会被顶回内容高。 */
 .empty-block.empty-surface {
+  flex: 1 1 auto;
+  min-height: 0;
   background: var(--app-bg-panel);
   border: 1px solid var(--color-border-2);
   border-radius: var(--app-radius-panel);

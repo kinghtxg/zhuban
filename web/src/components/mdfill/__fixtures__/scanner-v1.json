@@ -1,0 +1,487 @@
+{
+  "variables": [
+    {
+      "name": "项目名称",
+      "kind": "scalar",
+      "type": "string",
+      "path": "项目名称",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "系统名称",
+      "kind": "scalar",
+      "type": "string",
+      "path": "系统名称",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "系统地址",
+      "kind": "scalar",
+      "type": "string",
+      "path": "系统地址",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "系统备注",
+      "kind": "scalar",
+      "type": "string",
+      "path": "系统备注",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "系统数量",
+      "kind": "scalar",
+      "type": "string",
+      "path": "系统数量",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "高危数量",
+      "kind": "scalar",
+      "type": "string",
+      "path": "高危数量",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "中危数量",
+      "kind": "scalar",
+      "type": "string",
+      "path": "中危数量",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "低危数量",
+      "kind": "scalar",
+      "type": "string",
+      "path": "低危数量",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "严重数量",
+      "kind": "scalar",
+      "type": "string",
+      "path": "严重数量",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "漏洞合计",
+      "kind": "scalar",
+      "type": "string",
+      "path": "漏洞合计",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "总体危险程度",
+      "kind": "scalar",
+      "type": "string",
+      "path": "总体危险程度",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "报告日期",
+      "kind": "scalar",
+      "type": "string",
+      "path": "报告日期",
+      "required": true,
+      "sample": "（待填）"
+    },
+    {
+      "name": "漏洞列表",
+      "kind": "loop",
+      "iterable": "漏洞列表",
+      "loop_var": "漏洞",
+      "sample_size": 2,
+      "fields": [
+        {
+          "name": "编号",
+          "kind": "scalar",
+          "type": "string",
+          "path": "漏洞列表[].编号",
+          "sample": "（待填）"
+        },
+        {
+          "name": "名称",
+          "kind": "scalar",
+          "type": "string",
+          "path": "漏洞列表[].名称",
+          "sample": "（待填）"
+        },
+        {
+          "name": "等级",
+          "kind": "scalar",
+          "type": "string",
+          "path": "漏洞列表[].等级",
+          "sample": "（待填）"
+        },
+        {
+          "name": "影响范围",
+          "kind": "scalar",
+          "type": "string",
+          "path": "漏洞列表[].影响范围",
+          "sample": "（待填）"
+        },
+        {
+          "name": "漏洞地址",
+          "kind": "scalar",
+          "type": "string",
+          "path": "漏洞列表[].漏洞地址",
+          "sample": "（待填）"
+        },
+        {
+          "name": "描述",
+          "kind": "loop",
+          "type": "array",
+          "path": "漏洞列表[].描述",
+          "sample_size": 2,
+          "required": true,
+          "nested": true,
+          "loop_var": "描述段",
+          "fields": [
+            {
+              "name": "段落",
+              "kind": "scalar",
+              "type": "string",
+              "path": "漏洞列表[].描述[].段落",
+              "sample": "（待填）"
+            }
+          ]
+        },
+        {
+          "name": "详情",
+          "kind": "loop",
+          "type": "array",
+          "path": "漏洞列表[].详情",
+          "sample_size": 2,
+          "required": true,
+          "nested": true,
+          "loop_var": "详情段",
+          "fields": [
+            {
+              "name": "段落",
+              "kind": "scalar",
+              "type": "string",
+              "path": "漏洞列表[].详情[].段落",
+              "sample": "（待填）"
+            }
+          ]
+        },
+        {
+          "name": "建议",
+          "kind": "loop",
+          "type": "array",
+          "path": "漏洞列表[].建议",
+          "sample_size": 2,
+          "required": true,
+          "nested": true,
+          "loop_var": "建议段",
+          "fields": [
+            {
+              "name": "段落",
+              "kind": "scalar",
+              "type": "string",
+              "path": "漏洞列表[].建议[].段落",
+              "sample": "（待填）"
+            }
+          ]
+        },
+        {
+          "name": "截图",
+          "kind": "loop",
+          "type": "array",
+          "path": "漏洞列表[].截图",
+          "sample_size": 2,
+          "required": true,
+          "nested": true,
+          "loop_var": "图",
+          "fields": [
+            {
+              "name": "image_截图",
+              "kind": "image",
+              "type": "object",
+              "path": "漏洞列表[].截图[].image_截图"
+            }
+          ]
+        }
+      ],
+      "path": "漏洞列表",
+      "required": true
+    }
+  ],
+  "sample": {
+    "项目名称": "（待填）",
+    "系统名称": "（待填）",
+    "系统地址": "（待填）",
+    "系统备注": "（待填）",
+    "系统数量": "（待填）",
+    "高危数量": "（待填）",
+    "中危数量": "（待填）",
+    "低危数量": "（待填）",
+    "严重数量": "（待填）",
+    "漏洞合计": "（待填）",
+    "总体危险程度": "（待填）",
+    "报告日期": "（待填）",
+    "漏洞列表": [
+      {
+        "编号": "（待填）",
+        "名称": "（待填）",
+        "等级": "（待填）",
+        "影响范围": "（待填）",
+        "漏洞地址": "（待填）",
+        "描述": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "详情": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "建议": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "截图": [
+          {
+            "image_截图": {
+              "type": "image",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+              "width": 30,
+              "height": 30
+            }
+          },
+          {
+            "image_截图": {
+              "type": "image",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+              "width": 30,
+              "height": 30
+            }
+          }
+        ]
+      },
+      {
+        "编号": "（待填）",
+        "名称": "（待填）",
+        "等级": "（待填）",
+        "影响范围": "（待填）",
+        "漏洞地址": "（待填）",
+        "描述": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "详情": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "建议": [
+          {
+            "段落": "（待填）"
+          },
+          {
+            "段落": "（待填）"
+          }
+        ],
+        "截图": [
+          {
+            "image_截图": {
+              "type": "image",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+              "width": 30,
+              "height": 30
+            }
+          },
+          {
+            "image_截图": {
+              "type": "image",
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+              "width": 30,
+              "height": 30
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "schema": {
+    "type": "object",
+    "properties": {
+      "项目名称": {
+        "type": "string"
+      },
+      "系统名称": {
+        "type": "string"
+      },
+      "系统地址": {
+        "type": "string"
+      },
+      "系统备注": {
+        "type": "string"
+      },
+      "系统数量": {
+        "type": "string"
+      },
+      "高危数量": {
+        "type": "string"
+      },
+      "中危数量": {
+        "type": "string"
+      },
+      "低危数量": {
+        "type": "string"
+      },
+      "严重数量": {
+        "type": "string"
+      },
+      "漏洞合计": {
+        "type": "string"
+      },
+      "总体危险程度": {
+        "type": "string"
+      },
+      "报告日期": {
+        "type": "string"
+      },
+      "漏洞列表": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "编号": {
+              "type": "string"
+            },
+            "名称": {
+              "type": "string"
+            },
+            "等级": {
+              "type": "string"
+            },
+            "影响范围": {
+              "type": "string"
+            },
+            "漏洞地址": {
+              "type": "string"
+            },
+            "描述": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "段落": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "段落"
+                ]
+              }
+            },
+            "详情": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "段落": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "段落"
+                ]
+              }
+            },
+            "建议": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "段落": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "段落"
+                ]
+              }
+            },
+            "截图": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "image_截图": {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "src"
+                    ]
+                  }
+                },
+                "required": [
+                  "image_截图"
+                ]
+              }
+            }
+          },
+          "required": [
+            "编号",
+            "名称",
+            "等级",
+            "影响范围",
+            "漏洞地址",
+            "描述",
+            "详情",
+            "建议",
+            "截图"
+          ]
+        }
+      }
+    },
+    "required": [
+      "项目名称",
+      "系统名称",
+      "系统地址",
+      "系统备注",
+      "系统数量",
+      "高危数量",
+      "中危数量",
+      "低危数量",
+      "严重数量",
+      "漏洞合计",
+      "总体危险程度",
+      "报告日期",
+      "漏洞列表"
+    ]
+  },
+  "charts": [],
+  "diagnostics": []
+}
