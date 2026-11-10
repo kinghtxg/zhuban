@@ -53,6 +53,8 @@ import subprocess
 import sys
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
+from . import winfonts
+
 CONF_NAME = "99-zhuban-cjk-alias.conf"
 
 # （族名, 候选链）。左边是模板/Word 里会出现的写法，右边是**候选链**：
@@ -161,7 +163,15 @@ _BAD_MARKERS = (" JP", " KR", " TC", "Noto Sans CJK J", "Noto Serif CJK J")
 # --------------------------------------------------------------------------
 
 def fc_match(family: str) -> str:
-    """问 fontconfig：这个族名最终会落到哪个字体上。"""
+    """问 fontconfig：这个族名最终会落到哪个字体上。
+
+    Windows 上没有 fontconfig，也就没有等价的「这个族名会落到谁」的查询：
+    LibreOffice 自己的替换表不在我们能问的范围内。所以这里老实返回空串，
+    由 fontaudit.judge 按「本机有→exact / 没有→missing」两档判断。
+    宁可说「本机没有这款字体」，也不要瞎猜一个替代品糊过去。
+    """
+    if winfonts.supported():
+        return ""
     try:
         p = subprocess.run(
             ["fc-match", "-f", "%{family}", family],
@@ -180,7 +190,11 @@ def installed_families() -> Set[str]:
     这是「该不该补映射」的唯一依据。用它而不是 fc-match：fc-match 会把我们
     自己写进去的别名算作已解决，于是第二次启动时判定「已经好了」→ 删掉配置
     → 下次又缺 → 来回抖。fc-list 只反映磁盘上的字体文件，不存在这个自指问题。
+
+    Windows：没有 fc-list，改由 winfonts 直接读注册表登记的字体文件的 name 表。
     """
+    if winfonts.supported():
+        return winfonts.installed_families()
     try:
         p = subprocess.run(
             ["fc-list", "--format", "%{family}\n"],
@@ -361,6 +375,17 @@ def install() -> Dict[str, object]:
 def diagnose(families: Optional[Sequence[str]] = None) -> Dict[str, object]:
     """逐个族名体检，返回结构化结果（给 /healthz 与 /fonts/zh 用）。"""
     fams = list(families or [name for name, _ in ALIASES])
+    if winfonts.supported():
+        # Windows：没有「落到谁」这回事，只有「在不在」。在就 exact。
+        # 这条判据必须真读字体文件（winfonts.installed_families），不能用
+        # 注册表键名——键名是任意标签，实测随便写也能命中。
+        have = {n.lower() for n in winfonts.installed_families()}
+        checks = []
+        for fam in fams:
+            hit = fam.lower() in have
+            checks.append({"family": fam, "resolved": fam if hit else "", "ok": hit})
+        bad = [c["family"] for c in checks if not c["ok"]]
+        return {"ok": not bad, "failed": bad, "checks": checks, "platform": "windows"}
     checks = []
     for fam in fams:
         resolved = fc_match(fam)
@@ -389,6 +414,18 @@ def ensure(refresh: bool = True) -> Dict[str, object]:
     global _cache
     if _cache is not None and not refresh:
         return _cache
+    if winfonts.supported():
+        # Windows 上「补 fontconfig 别名」这件事整体不适用：没有 fontconfig，
+        # 也就没有「一个 TTC 里四张脸挑错一张」的问题 —— 族名就是字体文件
+        # 自己的族名。所以跳过 install（否则会往用户目录写一份没用的 conf），
+        # 只做体检。
+        try:
+            st = diagnose()
+        except Exception as e:  # noqa: BLE001
+            st = {"ok": False, "failed": ["(诊断失败)"], "checks": [], "error": str(e)[:200]}
+        st["install"] = {"conf": None, "written": False, "aliases": 0, "skipped": "windows"}
+        _cache = st
+        return st
     try:
         inst = install()
     except Exception as e:  # noqa: BLE001

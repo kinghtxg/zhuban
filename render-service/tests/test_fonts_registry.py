@@ -18,7 +18,20 @@ import os
 
 import pytest
 
-from app import fonts
+from app import fonts, winfonts
+
+
+@pytest.fixture(autouse=True)
+def _pin_fontconfig_platform(monkeypatch):
+    """整个文件测的都是 **fontconfig（fc-list / fc-cache）那套实现**。
+
+    Windows 上 `installed()` 与 `reload_cache()` 会改走 winfonts（读字体文件的
+    name 表 / 写 HKCU），这些用例的 mock 就都打不中了 —— 更糟的是不会报错，
+    只会静默地测到一个空实现然后「通过」。所以这里统一把平台钉成非 Windows，
+    保证它们在 Windows 开发机上也真的在测 fontconfig 那条路。
+    Windows 分支另见 test_winfonts_*.py。
+    """
+    monkeypatch.setattr(winfonts, "supported", lambda: False)
 
 
 # ==========================================================================
@@ -210,8 +223,17 @@ def test_installed_skips_malformed_lines(monkeypatch):
 # ==========================================================================
 
 def test_reload_cache_reports_elapsed_and_errors(monkeypatch):
-    """fc-cache 失败不抛：文件已经落盘了，抛异常会让用户以为上传失败。"""
+    """fc-cache 失败不抛：文件已经落盘了，抛异常会让用户以为上传失败。
+
+    测的是 fontconfig 那套实现，所以把平台钉成非 Windows：Windows 上
+    reload_cache 改走注册表（见 test_winfonts_wiring），不跑 fc-cache。
+    钉住平台是为了让这个用例在 Windows 上也真的测到东西，而不是被分支绕过。
+    """
     import subprocess
+
+    from app import winfonts
+
+    monkeypatch.setattr(winfonts, "supported", lambda: False)
 
     def fake(cmd, **k):
         class P:
@@ -228,6 +250,10 @@ def test_reload_cache_reports_elapsed_and_errors(monkeypatch):
 
 def test_reload_cache_survives_missing_fc_cache(monkeypatch):
     import subprocess
+
+    from app import winfonts
+
+    monkeypatch.setattr(winfonts, "supported", lambda: False)
 
     def boom(*a, **k):
         raise FileNotFoundError("fc-cache")

@@ -14,6 +14,8 @@ from typing import Dict, List, Optional
 
 from PIL import ImageFont
 
+from . import winfonts
+
 # 仓库内字体目录（app/ 的上一级）
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_FONTS = os.path.normpath(os.path.join(_PKG_DIR, "..", "fonts"))
@@ -115,9 +117,16 @@ def reload_cache(timeout: int = 30) -> Dict[str, object]:
 
     失败不抛异常——上传的字体文件已经落盘，只是这次没能立刻生效，
     交给调用方决定要不要提示用户重试。抛异常会让用户以为文件没传上去。
+
+    Windows 分支：没有 fontconfig，`fc-cache` 根本不存在，照原样走下去会
+    每次都返回 ok=false（前端提示「刷新缓存失败，请重启渲染服务」），而重启
+    也没用——LibreOffice 不看目录，只看系统已注册的字体。详见 winfonts 模块。
     """
     import subprocess
     import time
+
+    if winfonts.supported():
+        return winfonts.reload()
 
     started = time.time()
     cmds = [["fc-cache", "-f"], ["fc-cache", "-f", IMPORT_DIR]]
@@ -166,8 +175,12 @@ def installed() -> List[Dict[str, object]]:
 
     解析 fc-list 而不是自己读 ttf name 表：name 表有 16 个平台/语言组合，
     自己解析极易在中文字体上取到乱码；fontconfig 已经处理好了。
-    这里用 \\t 做分隔（family 里可能含逗号，逗号分隔会切坏）。
+
+    Windows 例外：没有 fc-list，改由 winfonts 遍历字体文件读 name 表。
+    两个分支返回同一形状（file/family/style/path/imported），调用方无感。
     """
+    if winfonts.supported():
+        return winfonts.installed_fonts(IMPORT_DIR)
     import subprocess
 
     out: List[Dict[str, object]] = []

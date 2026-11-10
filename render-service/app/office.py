@@ -5,7 +5,9 @@ import asyncio
 import os
 import shutil
 import subprocess
+import sys
 import uuid
+from pathlib import Path
 from typing import List
 
 from . import config
@@ -13,8 +15,18 @@ from . import config
 # 全局并发信号量（LibreOffice headless 多实例需独立 profile）
 _semaphore = asyncio.Semaphore(config.LO_CONCURRENCY)
 
+# 便携版把 LibreOffice / poppler 放在程序自己的目录里，不写系统 PATH。
+# 显式指定既省掉「猜装在哪儿」，也避免用户机器上另外装过一套 LibreOffice 时
+# 被 PATH 里那个抢走——两个版本对同一份 docx 的排版判断并不完全一致。
+_SOFFICE_ENV = "SOFFICE_PATH"
+_PDFTOPPM_ENV = "PDFTOPPM_PATH"
 
-def _which(names: List[str]) -> str | None:
+
+def _which(names: List[str], env_key: str = "") -> str | None:
+    if env_key:
+        forced = os.environ.get(env_key, "").strip().strip('"')
+        if forced and os.path.exists(forced):
+            return forced
     for n in names:
         p = shutil.which(n)
         if p:
@@ -29,11 +41,17 @@ def _which(names: List[str]) -> str | None:
 
 
 def soffice_path() -> str | None:
-    return _which(["soffice", "soffice.exe", "libreoffice", "libreoffice.exe"])
+    # 顺序有讲究：Windows 上 LibreOffice 同时提供 soffice.com 与 soffice.exe，
+    # 两者都是启动器，但 shutil.which("soffice") 会因 PATHEXT 先命中 .com。
+    # .com 是控制台程序，每转换一次就闪一个黑窗口；.exe 是图形子系统，headless
+    # 下不弹窗。桌面端跑预览时这个差别很显眼，所以显式排前面。
+    if sys.platform == "win32":
+        return _which(["soffice.exe", "soffice", "libreoffice.exe"], _SOFFICE_ENV)
+    return _which(["soffice", "libreoffice"], _SOFFICE_ENV)
 
 
 def pdftoppm_path() -> str | None:
-    return _which(["pdftoppm", "pdftoppm.exe"])
+    return _which(["pdftoppm.exe", "pdftoppm"], _PDFTOPPM_ENV)
 
 
 def libreoffice_available() -> bool:
@@ -49,27 +67,40 @@ async def convert_docx_to_pdf(docx_bytes: bytes, workdir: str) -> bytes:
     soffice = soffice_path()
     if not soffice:
         raise RuntimeError("LibreOffice 不可用")
+    workdir = os.path.abspath(workdir)
     os.makedirs(workdir, exist_ok=True)
     src = os.path.join(workdir, "input.docx")
     with open(src, "wb") as f:
         f.write(docx_bytes)
-    profile = f"file:///tmp/lo_{uuid.uuid4().hex}"
-    async with _semaphore:
-        proc = await asyncio.create_subprocess_exec(
-            soffice,
-            f"-env:UserInstallation={profile}",
-            "--headless",
-            "--convert-to", "pdf",
-            "--outdir", workdir,
-            src,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.RENDER_TIMEOUT_SECONDS)
-        except asyncio.TimeoutError:
-            proc.kill()
-            raise RuntimeError(f"LibreOffice 转换超时（{config.RENDER_TIMEOUT_SECONDS}s）")
+    # 用户配置目录必须由 Path.as_uri() 生成，不能手写 "file:///tmp/..."：
+    # Linux 上 file:///tmp/x 是合法绝对路径，Windows 上则是**没有盘符**的
+    # file URI —— soffice 会卡在一个看不见的对话框里直到超时（实测 45s 零产出，
+    # 只剩一句「转换超时」，看着像 LibreOffice 装坏了）。as_uri() 在 Windows
+    # 上补成 file:///C:/...，两端都对。放在 workdir 里，转换结束随它一起删。
+    profile_dir = os.path.join(workdir, "lo-profile-" + uuid.uuid4().hex)
+    profile = Path(profile_dir).as_uri()
+    try:
+        async with _semaphore:
+            proc = await asyncio.create_subprocess_exec(
+                soffice,
+                f"-env:UserInstallation={profile}",
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", workdir,
+                src,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=config.RENDER_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                raise RuntimeError(f"LibreOffice 转换超时（{config.RENDER_TIMEOUT_SECONDS}s）")
+    finally:
+        # 每份 profile 约 1.1MB / 137 个文件。容器里随容器销毁，无所谓；
+        # 桌面端是常驻进程，每转一次就留一份，一周能堆出几千个目录。
+        shutil.rmtree(profile_dir, ignore_errors=True)
     pdf_path = os.path.join(workdir, "input.pdf")
     if not os.path.exists(pdf_path):
         raise RuntimeError(f"LibreOffice 未产出 PDF: {stderr.decode('utf-8','ignore')[:500]}")

@@ -241,7 +241,16 @@ def test_write_conf_falls_back_to_next_writable_dir(tmp_path):
 # ---------------------------------------------------------------- 体检
 
 def test_diagnose_reports_failed_families(monkeypatch):
-    """有族名落错时要能点名，而不是只回一个笼统的 false。"""
+    """有族名落错时要能点名，而不是只回一个笼统的 false。
+
+    这里测的是 **fontconfig 那套实现**（fc-match 的落点判定）。Windows 上
+    diagnose 走另一条分支（直接读字体文件的 name 表，没有「落点」这回事），
+    所以先把平台钉成非 Windows —— 否则在 Windows 机器上跑这个用例会变成
+    「什么都没测却显示通过」。
+    """
+    from app import winfonts
+
+    monkeypatch.setattr(winfonts, "supported", lambda: False)
     monkeypatch.setattr(cjk_fonts, "fc_match",
                         lambda f: "Noto Serif CJK JP" if f == "宋体" else "Noto Sans CJK SC")
     st = cjk_fonts.diagnose(["宋体", "黑体"])
@@ -251,6 +260,9 @@ def test_diagnose_reports_failed_families(monkeypatch):
 
 
 def test_diagnose_all_good(monkeypatch):
+    from app import winfonts
+
+    monkeypatch.setattr(winfonts, "supported", lambda: False)
     monkeypatch.setattr(cjk_fonts, "fc_match", lambda f: "Noto Serif CJK SC")
     st = cjk_fonts.diagnose(["宋体", "黑体"])
     assert st["ok"] is True and st["failed"] == []
