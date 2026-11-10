@@ -1,0 +1,76 @@
+# 运行期数据
+volumes/
+data/
+.tmp/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+render-service/.pytest_cache/
+render-service/tmp/
+
+# Node / 前端
+web/node_modules/
+web/dist/assets/
+# 注意：web/dist/index.html 占位文件需保留（embed.go 的 go:embed 需要该目录存在），故只忽略构建产物目录
+# Playwright：会话状态文件里有登录 cookie，绝不入库
+web/.auth/
+web/test-results/
+web/playwright-report/
+# Playwright 的默认 outputDir 里已经堆了几百个历史产物，清空时会被本地环境的
+# 批量删除保护拦下来，所以跑测试时用 --output 指到带时间戳的目录。
+web/.pw-out-*/
+web/tsconfig.app.tsbuildinfo
+web/tsconfig.node.tsbuildinfo
+
+# 构建产物备份目录（重构前后的 dist 快照，确认无误后可手动删除）
+web/dist.*/
+
+# 本地配置与密钥（绝不入库）
+.env
+deploy/.env.production
+
+# 验证/测试产物（非源码，含会话 cookie 等）
+deploy/e2e/
+samples/_verify/
+verify/
+*.zip
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 中文字体（专有，从 Windows 拷贝，不入仓）
+# 例外：保留 README，避免 clone 后 fonts/ 为空却无任何提示
+fonts/*
+!fonts/README.md
+
+# 测试过程中手拼的图表样本（临时产物，不进仓库）
+render-service/tests/_chart-*.docx
+verify/_probe_*.py
+
+# 打包上传用的临时 tarball
+_*.tgz
+
+# 部署打包时生成的改动清单
+_changed.txt
+
+# 覆盖率产物与临时查询结果（本地生成，不入库）
+cover.out
+*.cover
+.tmp-*.json
+# 本地跑服务与截图审计的临时目录（里面是二进制与 png，别入库）
+.tmp-run/
+.tmp-shots/
+
+# 本地验收临时目录（截图、测试库、临时二进制）
+.tmp-install/
+
+# 本地渲染/校验产物
+.tmp-*.docx
+.tmp-*.json
+web/.tmp-*.cjs
+.tmp-e2e/

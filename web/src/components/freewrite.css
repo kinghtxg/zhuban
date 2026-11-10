@@ -1,0 +1,202 @@
+/* 「粘贴整篇，自动对位」抽屉。
+   
+   布局是一上一下：上面写/粘，下面出建议。不做左右分栏——左边粘右边看
+   听起来高效，但用户粘的是一整篇长文，分栏后两边都得各滚动一次，
+   反而找不着自己在看哪一段。 */
+
+.df-fw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.df-fw-tip {
+  flex: none;
+}
+
+.df-fw-tip-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--app-text-caption);
+  line-height: 1.6;
+}
+
+/* ---------------- 粘贴区 ---------------- */
+
+.df-fw-editor {
+  border: 1px solid var(--app-border);
+  border-radius: var(--border-radius-medium);
+  background: var(--color-bg-2);
+  overflow: hidden;
+}
+
+.df-fw-editor:focus-within {
+  border-color: rgb(var(--primary-6));
+}
+
+.df-fw-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--app-border-light);
+  background: var(--color-fill-1);
+  font-size: 12px;
+  color: var(--app-text-body);
+}
+
+.df-fw-editor-hint {
+  color: var(--app-text-caption);
+}
+
+.df-fw-box-wrap {
+  position: relative;
+}
+
+.df-fw-ph {
+  position: absolute;
+  inset: 12px;
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--color-text-4);
+}
+
+.df-fw-box {
+  min-height: 220px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 12px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--app-text-body);
+  word-break: break-word;
+}
+
+/* 粘进来的图会带着 Word/截图工具的原始尺寸，不限宽会把抽屉撑出横向滚动条 */
+.df-fw-box img {
+  max-width: 100%;
+  height: auto;
+  margin: 4px 0;
+}
+
+/* Word 粘过来的内容常带显式字体字号，这里不复位它们——那正是识别信号。
+   只兜住"行高会不会塌"这一件事。 */
+.df-fw-box p,
+.df-fw-box div {
+  margin: 0 0 2px;
+}
+
+.df-fw-editor-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--app-border-light);
+  background: var(--color-fill-1);
+}
+
+/* ---------------- 建议列表 ---------------- */
+
+.df-fw-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.df-fw-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 2px;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--app-text-body);
+}
+
+.df-fw-result-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--app-text-caption);
+}
+
+/* 一条建议：整行的可点区域要明确。未勾选的行降透明度而不是隐藏——
+   用户需要看到"系统本来想填这儿"，才知道自己漏了什么。 */
+.df-fw-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border-light);
+  border-radius: var(--border-radius-medium);
+  background: var(--color-bg-2);
+  opacity: 0.72;
+  transition: opacity var(--transition-fast), border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.df-fw-item:hover {
+  opacity: 1;
+  border-color: var(--app-border-strong);
+}
+
+.df-fw-item.is-on {
+  opacity: 1;
+  border-color: rgb(var(--primary-5));
+  box-shadow: 0 0 0 1px rgb(var(--primary-2));
+}
+
+.df-fw-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.df-fw-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.df-fw-slot {
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--app-text-body);
+}
+
+/* 「依据」是这套功能能不能被信任的关键：用户看得到"凭什么是这一处"，
+   才敢勾。所以用弱化色但允许换行，不截断成一行省略号。 */
+.df-fw-why {
+  font-size: 12px;
+  color: var(--app-text-caption);
+  line-height: 1.5;
+}
+
+.df-fw-value {
+  font-size: 12px;
+  color: var(--app-text-caption);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.df-fw-empty {
+  color: var(--color-text-4);
+}
+
+.df-fw-thumb {
+  max-width: 120px;
+  max-height: 80px;
+  border: 1px solid var(--app-border-light);
+  border-radius: var(--border-radius-small);
+}
+
+.df-fw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
